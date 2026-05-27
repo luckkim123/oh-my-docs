@@ -1,0 +1,48 @@
+"""oh-my-docs UserPromptSubmit hook: inject a document-routing checkpoint.
+
+Stdlib only (no runtime deps — a test enforces this). The hook does NOT decide
+anything itself; it injects a one-line checkpoint that reminds the session LLM,
+when a document request is detected, to route format + stage before acting. The
+actual format/trap knowledge lives in references/formats/*.md (single source of
+truth) and the stage logic in skills/docs-*/SKILL.md — this hook never embeds
+that knowledge inline, so there is no drift.
+
+Layering: omha (the meta-harness) picks the LANE (superpowers / oh-my-claudecode
+/ handle-directly). This OMD hook fires only inside the document domain — it
+picks FORMAT + STAGE within that lane. The two do not conflict.
+
+MVP: static checkpoint text (no keyword parsing). Stage 2 may add dynamic
+format-keyword detection that reads the skills' Triggers. Fail-open: any error
+returns 0 so the session is never blocked.
+"""
+import json
+import sys
+
+CHECKPOINT = (
+    "<omd-routing>\n"
+    "문서 작업 요청(.pptx/.docx/.hwpx 생성·수정·검토·양식추출)이면, 행동 전에 한 줄로 판정하라:\n"
+    "- 포맷: pptx / docx / hwpx — references/formats/<format>.md 카드가 도구·함정·수식의 단일 진실.\n"
+    "- 단계: intake(의중) / standardize(양식추출) / plan(구조) / build(산출) / "
+    "inspect(형성적 검토) / verify(총괄 검증), 또는 docs-pilot(통째).\n"
+    "단일 단계면 그 스킬 직접, 브리프→완성이면 docs-pilot. 수식은 카드가 VERIFIED 표시한 경로만.\n"
+    "문서 작업이 아니면 이 블록 무시.\n"
+    "</omd-routing>"
+)
+
+
+def main() -> int:
+    try:
+        out = {
+            "hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit",
+                "additionalContext": CHECKPOINT,
+            }
+        }
+        print(json.dumps(out))
+    except Exception:
+        return 0  # fail-open — never block the session
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

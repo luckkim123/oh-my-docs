@@ -4,5 +4,30 @@
   "author": { "name": "kimseungmin" },
   "license": "MIT",
   "keywords": ["claude-code", "plugin", "documents", "pptx", "orchestration", "multi-agent"],
-  "skills": []
+  "skills": [
+    "./skills/docs-intake/",
+    "./skills/docs-standardize/",
+    "./skills/docs-plan/",
+    "./skills/docs-build/",
+    "./skills/docs-inspect/",
+    "./skills/docs-verify/",
+    "./skills/docs-convert/",
+    "./skills/docs-revise/",
+    "./skills/docs-translate/",
+    "./skills/docs-pilot/"
+  ],
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/route_emit.py"]
+          }
+        ]
+      }
+    ]
+  }
 }
