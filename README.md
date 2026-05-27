@@ -1,0 +1,1 @@
+oh-my-docs is a document-work harness (pptx/docx/xlsx/hwpx) — one of the specialized harnesses that the omha meta-coordinator routes document tasks to. This repo is currently an empty skeleton; real skills (docs-pptx, docs-pilot, etc.) are planned for a later iteration. Design doc: /Users/kimseungmin/Desktop/workspace/00-09_Meta/02_Decisions/2026-05-27-oh-my-docs-design.md
