@@ -24,8 +24,10 @@ CHECKPOINT = (
     "- 포맷: pptx / docx / hwpx — references/formats/<format>.md 카드가 도구·함정·수식의 단일 진실.\n"
     "- 단계: intake(의중) / standardize(양식추출) / plan(구조) / build(산출) / "
     "inspect(형성적 검토) / verify(총괄 검증), 또는 docs-pilot(통째).\n"
-    "단일 단계면 그 스킬 직접, 브리프→완성이면 docs-pilot. 수식은 카드가 VERIFIED 표시한 경로만.\n"
-    "문서 작업이 아니면 이 블록 무시.\n"
+    "단일 단계면 그 스킬 직접, 브리프→완성이면 docs-pilot. 수식은 카드가 VERIFIED 표시한 경로만.\n\n"
+    "문서 작업이면, 판정을 응답 맨 앞 omha ROUTE 줄 바로 다음에 이 한 줄로 출력하라(누락 금지):\n"
+    "STAGE(docs) → <intake|standardize|plan|build|inspect|verify|docs-pilot> · <pptx|docx|hwpx> · <한 줄 근거>\n"
+    "문서 작업이 아니면 이 블록 전체 무시(STAGE 줄도 출력하지 말 것).\n"
     "</omd-routing>"
 )
 

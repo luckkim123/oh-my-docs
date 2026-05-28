@@ -45,6 +45,15 @@ disallowedTools: Write, Edit, NotebookEdit
     - Use Bash to render a reference deck to images (soffice --convert-to pdf, then pdftoppm) when a visual design system must be extracted.
     - Use Grep/Glob to locate inputs and related assets.
     - Read references/formats/<format>.md to know the format's extractable properties.
+    <External_Consultation>
+      When rendering a reference deck misbehaves in a way the format card does not explain
+      (color shift, font fallback, wrong resolution, --convert-to producing nothing), consult
+      external docs before working around it blindly:
+      - Prefer Context7 (if available) for LibreOffice/soffice conversion options and pdftoppm flags.
+      - Else WebFetch the official LibreOffice documentation for the relevant flag.
+      Skip silently when rendering completes cleanly. You remain read-only — consult to render
+      faithfully, never to modify the source.
+    </External_Consultation>
   </Tool_Usage>
 
   <Execution_Policy>

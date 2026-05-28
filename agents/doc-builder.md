@@ -46,6 +46,16 @@ level: 2
     - Use Write to create the build script; Bash (python3) to run it and to render PNGs.
     - Use Read to consume the outline, the analyzer report, the format card, and your own rendered PNGs.
     - Do NOT use the Skill tool to call ppt-academic/ppt-edit — build directly from the card.
+    <External_Consultation>
+      The format card (references/formats/<format>.md) is the first source of truth. When you hit
+      python-pptx / python-docx / soffice behavior the card does NOT cover (an OMML/image edge case,
+      a shape-positioning quirk, a version-specific API), consult external docs before guessing:
+      - Prefer Context7 (if available) for current python-pptx / python-docx / LibreOffice API docs.
+      - Else WebFetch the official documentation or a python-pptx GitHub issue/example.
+      Skip silently when the card already marks the path VERIFIED — do not consult for covered cases.
+      NEVER fabricate a formula path the card marks UNVERIFIED; if external docs do not resolve it,
+      stop and report the gap rather than injecting OMML that may trigger the repair dialog.
+    </External_Consultation>
   </Tool_Usage>
 
   <Execution_Policy>

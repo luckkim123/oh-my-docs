@@ -17,11 +17,16 @@ agents/   doc-analyzer · doc-planner · doc-builder · doc-inspector · doc-ver
 references/formats/{pptx,docx,hwpx}.md   format tools/traps/formula knowledge (single source of truth)
 references/rubrics/ppteval.md            Content/Design/Coherence (inspect + verify)
 hooks/route_emit.py                      UserPromptSubmit format/stage routing checkpoint (stdlib only)
+hooks/docs_verify_emit.py                PostToolUse — after a Bash document build/convert, a
+                                         freeze-safe docs-verify reminder (stdlib only, fail-open)
 ```
 
 Skills are thin scores; agents are the brains they dispatch (`Task(subagent_type="oh-my-docs:doc-*")`).
 `docs-inspect` (formative) and `docs-verify` (summative) are deliberately separate lanes — no
-self-approval. `docs-pilot` orchestrates the full brief→document flow with a user gate at each step.
+self-approval (doc-verifier carries the triple ban: read-only tools + separate-pass constraint +
+Role NOT-responsible for authoring). Agents that hit uncovered SDK behavior consult external docs
+(`<External_Consultation>`: format card → Context7 → official docs) rather than guessing.
+`docs-pilot` orchestrates the full brief→document flow with a user gate at each step.
 
 ## Status (2026-05-28)
 
