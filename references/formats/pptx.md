@@ -33,8 +33,45 @@ pdftoppm -png -r 150 <deck.pdf> <dir>/slide   # ≥150 dpi — low dpi hides ove
   these; build fresh shapes instead.
 - **Orphan slideMaster** triggers the PowerPoint "repair" dialog even when the file opens in
   soffice. Integrity check must catch dangling relationships and orphan masters (see verify card).
+- **Unescaped `&` (or `<`) in injected text → repair dialog + render dropout** `[VERIFIED ✓ — 2026-05-28]`:
+  when you build new run text yourself (not copied from an existing run), raw `&` / `<` / `>` break
+  XML parsing. Symptom is twofold and easy to misread: (1) **PowerPoint shows the "repair" dialog**,
+  and (2) **the paragraph containing the bad char — and everything after it in that shape — silently
+  vanishes from the soffice render**. A wasted detour is to blame the missing paragraph on box height
+  / `spAutoFit` clipping; it is not height, it is the parser stopping at the `&`. **Always escape new
+  text**: `&`→`&amp;`, `<`→`&lt;`, `>`→`&gt;`. Runs copied from the original are already escaped — only
+  hand-typed additions bite. Validate with `xml.etree.ElementTree.fromstring()` on the part before repackaging.
+- **zip-update duplicate part → repair dialog** `[VERIFIED ✓ — 2026-05-28]`:
+  running `zip deck.pptx ppt/slides/slideN.xml` **twice for the same path across separate commands**
+  can leave **two entries for that part** in the archive. `unzip -t` (CRC) still passes, but OOXML
+  forbids duplicate parts so PowerPoint demands repair. Replace each part **once per repackage**, or
+  rebuild the whole zip clean. Detect with `collections.Counter(ZipFile(f).namelist())` — CRC alone
+  will not catch it.
+- **Repackage verify gate**: after any `zip`-update of a part, do NOT trust `unzip -t` alone. Run the
+  full check: (1) CRC, (2) **no duplicate names**, (3) **ET.fromstring on every edited slide XML**,
+  (4) `Presentation(file)` opens via python-pptx (same OPC parser class as PowerPoint), (5) edited
+  parts still have `[Content_Types].xml` Overrides. Both repair-dialog traps above pass CRC but fail
+  checks 2–4 — those are what actually predict the PowerPoint repair prompt.
 - **AlternateContent (Choice/Fallback)**: a shape can have two XML representations; editing only
   one leaves them inconsistent. Inspect both branches.
+- **Copied-shape namespace ghost → PowerPoint render dropout** `[VERIFIED ✓ — 2026-05-28]`:
+  a shape pasted in from another deck can drag a **local namespace declaration onto its own `<p:sp>`
+  root** (e.g. `<p:sp xmlns:a14="...">`) plus inline `extLst`/`a16:creationId`, while the slide root
+  (`<p:sld>`) declares neither `a14` nor `mc`. The XML is otherwise valid — text, coords, color,
+  `hidden`, cNvPr id all check out — yet **PowerPoint (Mac) silently skips that one shape at render
+  time**. The body looks present on disk but is absent on the user's screen. This is the **inverse
+  of the python-pptx false-negative** (there: text on disk, tool can't read it; here: text on disk,
+  renderer won't draw it) and a cousin of the AlternateContent trap (different renderer fails).
+  - **Diagnose**: dump every `<p:sp>` open tag and flag any carrying a local `xmlns:`; the offending
+    shape is the lone one with it. Also compare `<a:rPr lang=...>` — a copied EN shape often carries
+    `lang="ko-KR"` while its visible siblings use `en-US`.
+  - **Fix**: rebuild the shape from a *visible sibling's* sp template on the same slide — strip the
+    local `xmlns`, drop the inline `extLst`/`creationId`, set `lang="en-US"`, keep coords/font/text.
+    Normalizing to the sibling shape resolves it regardless of which factor was the true culprit.
+  - **Authority rule**: the user's PowerPoint screen is ground truth, NOT the disk render. If a
+    shape is on disk but the user says it's invisible, do **not** argue the disk render is right —
+    this trap is exactly why disk-present ≠ screen-visible. soffice may render it fine yet PowerPoint
+    drops it, so a clean soffice PNG does not clear the trap; only the user's PowerPoint confirms.
 - **Korean font**: set `Apple SD Gothic Neo` explicitly for KO text, or soffice substitutes and
   the PNG looks wrong.
 
