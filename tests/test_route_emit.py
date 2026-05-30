@@ -47,14 +47,30 @@ def test_context_states_stage_emit_contract():
 
 
 def test_context_lists_all_stages():
-    """③ 8개 단계가 contract 에 모두 열거돼야 (skill 과 정합).
+    """③ 9개 단계가 contract 에 모두 열거돼야 (skill 과 정합).
 
     revise 는 docs-revise 스킬이 실재하므로 STAGE 카탈로그에 포함돼야 한다
-    (T14 에서 누락을 수정). pilot 은 docs-pilot 로 표기."""
+    (T14 에서 누락을 수정). pilot 은 docs-pilot 로 표기.
+    learn 은 docs-learn 스킬(관찰→style-spec 기본값 승격, 사람 게이트)이
+    실재하므로 메타 단계로 포함돼야 한다 (H9 에서 추가)."""
     out = context_of(run_hook({"prompt": "문서 작업"}))
     for stage in ("intake", "standardize", "plan", "build",
-                  "inspect", "verify", "revise", "docs-pilot"):
+                  "inspect", "verify", "revise", "learn", "docs-pilot"):
         assert stage in out, f"stage '{stage}' missing from contract"
+
+
+def test_learn_stage_in_routing_token_line():
+    """③-b learn 메타 단계가 STAGE 토큰 줄에 명시돼야 (H9)."""
+    out = context_of(run_hook({"prompt": "이 양식 기본값으로 굳혀줘"}))
+    assert "learn" in out
+    assert "사람 게이트" in out  # 자동 발동 아님
+
+
+def test_learn_routing_keeps_content_guard():
+    """③-c learn 추가가 content-preservation 가드를 깨지 않아야 (H9·§6.F)."""
+    out = context_of(run_hook({"prompt": "promote default"}))
+    # content 는 learn 승격 대상이 아님(form 만)이 라우팅에 박혀야
+    assert "content 는 승격 대상 아님" in out or "form 만" in out
 
 
 def test_context_lists_formats():
