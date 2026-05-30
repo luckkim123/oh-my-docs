@@ -31,8 +31,9 @@ description: |
 
 <Format_Knowledge>
 포맷별 도구·함정·수식·버전정책은 **references/formats/<format>.md 카드가 단일 진실**. 이 스킬·에이전트에 복제하지 말고 카드를 읽어라:
-- pptx → references/formats/pptx.md (python-pptx, 수식 2경로, 버전 스냅샷)
-- docx → references/formats/docx.md (stub)
+- pptx → references/formats/pptx.md (python-pptx, 수식 = matplotlib PNG only[soffice가 OMML 미렌더], 버전 스냅샷)
+- docx → references/formats/docx.md (python-docx, 수식 2경로[OMML 편집가능 VERIFIED + matplotlib 폴백], 헤더/PAGE 필드/한글폰트 함정)
+- xlsx → references/formats/xlsx.md (openpyxl/xlsxwriter 라우팅, `<v>0</v>` 수식캐시 함정, 구조검증 게이트[PNG 정독 아님])
 - hwpx → references/formats/hwpx.md (stub)
 </Format_Knowledge>
 

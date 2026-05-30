@@ -28,12 +28,14 @@ Role NOT-responsible for authoring). Agents that hit uncovered SDK behavior cons
 (`<External_Consultation>`: format card → Context7 → official docs) rather than guessing.
 `docs-pilot` orchestrates the full brief→document flow with a user gate at each step.
 
-## Status (2026-05-28)
+## Status (2026-05-31)
 
 MVP: **pptx pilot**. Skills, agents, format cards, and routing hook are implemented and structurally
-verified. Formula rendering proven (matplotlib-image path VERIFIED via soffice; native OMML path is
-PowerPoint-only). docx/hwpx are stub cards — build logic clones after the pptx pilot is validated
-end-to-end in a live session.
+verified. Format cards: **pptx, docx, xlsx complete; hwpx stub**. Formula rendering proven by real
+soffice renders: **docx** native OMML path VERIFIED (editable math, with two documented soffice
+caveats — `\hat` accent, `\sum`/`\,` tofu box) plus matplotlib-image fallback; **pptx** is
+matplotlib-image only (soffice/Impress renders native OMML blank). The docx/xlsx build paths follow
+their cards but are piloted after pptx is validated end-to-end in a live session.
 
 Design: the stage-centric redesign decision doc (maintained in the author's planning notes, outside this repo).
 
@@ -66,5 +68,6 @@ winget install TheDocumentFoundation.LibreOffice
 The runtime itself is cross-platform (the format cards and cleanup logic branch macOS/Linux/Windows).
 `.hwp` conversion is the one exception — it needs Windows + Hancom COM (see `references/formats/hwpx.md`).
 
-(python-docx is wired but the docx build path is stub-level until the pptx pilot ships
-end-to-end.)
+(python-docx is wired and the docx format card is complete; the build path is exercised after the
+pptx pilot ships end-to-end. xlsx uses openpyxl/xlsxwriter — `pip install openpyxl xlsxwriter` when
+building spreadsheets.)

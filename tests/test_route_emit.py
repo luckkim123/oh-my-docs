@@ -74,9 +74,12 @@ def test_learn_routing_keeps_content_guard():
 
 
 def test_context_lists_formats():
-    """④ 세 포맷(pptx/docx/hwpx)이 contract 에 열거돼야 — STAGE 줄에 FORMAT 슬롯."""
+    """④ 네 포맷(pptx/docx/xlsx/hwpx)이 contract 에 열거돼야 — STAGE 줄에 FORMAT 슬롯.
+
+    xlsx 는 references/formats/xlsx.md 카드(openpyxl/xlsxwriter 라우팅, <v>0</v> 함정,
+    구조검증 게이트)가 실재하므로 포맷 목록에 포함돼야 한다 (2026-05-31 신설)."""
     out = context_of(run_hook({"prompt": "발표자료"}))
-    for fmt in ("pptx", "docx", "hwpx"):
+    for fmt in ("pptx", "docx", "xlsx", "hwpx"):
         assert fmt in out, f"format '{fmt}' missing from contract"
 
 
