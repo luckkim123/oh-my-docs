@@ -23,7 +23,7 @@ pdftoppm -png -r 150 <deck.pdf> <dir>/slide   # ≥150 dpi — low dpi hides ove
 
 ## Hard traps (carried from defense ppt-edit experience)
 
-- **Never edit in place.** Original is sacred. Write to `outputs/<doc>/current.pptx`; the source
+- **Never edit in place.** Original is sacred. Write to `outputs/<slug>/current.pptx`; the source
   file is never mutated. (See version-snapshot policy below.)
 - **Provenance lock**: before replacing any text, read and quote the original run first. Never
   invent replacement text (especially titles) — fabricated English titles is a logged regression.
@@ -110,16 +110,26 @@ exactly this test; Path B passed it.)
 
 ## Version-snapshot policy (binary files can't git-diff)
 
+Layout is the fixed, deterministic structure in `references/output-layout.md` — the single
+delivered copy lives in `outputs/`, all work-product (version copies, PNG renders, intermediates)
+lives in the `.omd/` work area, so the output folder never bloats with snapshots:
+
 ```
-outputs/<doc-name>/
-├── current.pptx                         # the working copy — always edit this
+outputs/<slug>/
+└── current.pptx                         # the one delivered copy — always edit this
+
+.omd/<slug>/                             # work area (Claude-facing; pruned at terminal)
 ├── versions/
-│   ├── v1_YYYYMMDD_initial.pptx
-│   └── v2_YYYYMMDD_<change-summary>.pptx # snapshot taken JUST BEFORE a large edit
-├── thumbnails/                          # PNG renders for proofreading
-└── manifest.json                        # {version, timestamp, summary} history
+│   ├── v01_YYYY-MM-DD_initial.pptx
+│   └── v02_YYYY-MM-DD_<change-summary>.pptx  # snapshot taken JUST BEFORE a large edit
+├── renders/current/slide-NNN.png        # PNG renders for proofreading (≥150 dpi)
+├── gen-image/                           # generated diagrams/backgrounds (when used)
+└── tmp/                                 # soffice/pdftoppm intermediates — disposable
 ```
-- Snapshot only **before a large edit** (not for a one-line text swap — avoids the 12 GB bloat
-  that buried the defense folder in PPT copies).
-- `doc-verifier` warns when `versions/` exceeds a threshold → offer to prune old versions.
-- ⚠️ This workspace syncs via iCloud; `versions/` copies sync too. Keep the user aware of size.
+- Version filename: `v{NN}_{YYYY-MM-DD}_{summary}.pptx`, `NN` zero-padded (v01, v02, … v10) so
+  `ls` order = version order; `summary` is kebab-case, ≤ 30 chars.
+- Snapshot only **before a large edit** (section add/remove, structural change, many slides
+  affected) — not for a one-line text swap, which keeps the version count (and disk use) bounded.
+- `doc-verifier` warns when `.omd/<slug>/versions/` exceeds a threshold → offer to prune.
+- `versions/` snapshots and `renders/` PNGs are work-product, not deliverables: they stay out of
+  `outputs/` and are cleaned at the end of the pipeline (see `references/output-layout.md` §5).

@@ -19,4 +19,6 @@
 - **.hwp input is a conversion GATE, not a build path**: normalize to hwpx/docx (manual export on
   macOS) before any OMD stage touches it. Direct .hwp write is out of scope (see hwpx card).
 - A row is `VERIFIED ✓` only after an actual conversion ran and the output was confirmed. No guessing.
-- Conversion never mutates the source — write to outputs/<doc>/ with a new extension.
+- Conversion never mutates the source — write to outputs/<slug>/ with a new extension (a delivery
+  conversion is a separate output family from the build's `current.<ext>`; it shares the folder but
+  does not overwrite `current.<ext>`). See references/output-layout.md for the folder convention.

@@ -22,7 +22,8 @@ disallowedTools: Write, Edit, NotebookEdit
     - Every slide/page rendered (≥150 dpi) and read — full proofread, not just changed slides.
     - Every outline-required section present (spec completeness).
     - A clear PASS / FAIL verdict; FAIL on any failed integrity check, any missing required section, or any unreadable/overflowing slide.
-    - versions/ checked; if it exceeds the snapshot threshold, prune is recommended.
+    - `.omd/<slug>/versions/` checked; if it exceeds the snapshot threshold, prune is recommended.
+    - The PASS/FAIL verdict is bound to the snapshot identifier of the artifact it verified — so a later round cannot reuse a stale PASS.
   </Success_Criteria>
 
   <Constraints>
@@ -34,15 +35,17 @@ disallowedTools: Write, Edit, NotebookEdit
     - Run the checks yourself via Bash. Do not trust the builder's sanity-render claim.
     - Proofread ALL slides — a regression on an unchanged slide (e.g. a dropped title) is the exact failure full proofread catches.
     - Integrity is binary: 4/5 is a FAIL. The orphan-slideMaster and dangling-relationship checks specifically guard the repair dialog.
+    - **Snapshot-correlation token (stale-PASS guard)**: bind every PASS/FAIL verdict to the snapshot identifier of the artifact actually verified this round — the mtime or CRC of `outputs/<slug>/current.<ext>` plus the set of blocker IDs this round addressed. Across a multi-round revise loop, never reuse a prior round's PASS: if the identifier differs from the current on-disk state, that PASS is void (must re-verify). This elevates the "no PASS without fresh evidence" rule from prose to a token check — a slide PNG render is expensive, so stale-evidence risk is higher than in code (cf. "don't argue from a disk render; the audience's PowerPoint is authority").
   </Constraints>
 
   <Investigation_Protocol>
     1) Read the approved outline (for spec completeness) and references/formats/<format>.md (integrity definitions) + references/rubrics/ppteval.md (Design/Coherence checks).
-    2) Run integrity checks on outputs/<doc>/current.<ext>: zip CRC, engine parse (python-pptx/docx open), soffice --convert-to pdf, scan for dangling relationships and orphan slideMaster.
+    2) Run integrity checks on outputs/<slug>/current.<ext>: zip CRC, engine parse (python-pptx/docx open), soffice --convert-to pdf, scan for dangling relationships and orphan slideMaster.
     3) Render every slide to PNG at ≥150 dpi and read each.
     4) Spec completeness: confirm every outline-required section is present.
-    5) Check versions/ count against the snapshot threshold.
-    6) Issue PASS / FAIL with the evidence table.
+    5) Check `.omd/<slug>/versions/` count against the snapshot threshold.
+    6) Capture the snapshot identifier: mtime or CRC of `outputs/<slug>/current.<ext>` (`stat -f %m` / `stat -c %Y`, or `unzip -t` CRC line), together with the blocker IDs addressed this round.
+    7) Issue PASS / FAIL with the evidence table, including the snapshot identifier.
   </Investigation_Protocol>
 
   <Tool_Usage>
@@ -72,6 +75,9 @@ disallowedTools: Write, Edit, NotebookEdit
     ### Verdict
     **Status**: PASS | FAIL
     **Blockers**: [count — 0 means PASS]
+    **Target snapshot**: [outputs/<slug>/current.<ext> mtime or CRC — e.g. `current.pptx@1780127000` or CRC] · blocker IDs: [set or "full fresh pass"]
+
+    > This verdict is valid only for the snapshot above. If the file is modified afterward (mtime/CRC changes), this PASS is void — the next revise round must not reuse it; re-verify.
 
     ### Integrity (all 5 must pass)
     | Check | Result | Command | Output |
@@ -90,7 +96,7 @@ disallowedTools: Write, Edit, NotebookEdit
     |------------------|---------|
 
     ### Versions
-    - versions/ count: N — [within threshold / prune recommended]
+    - `.omd/<slug>/versions/` count: N — [within threshold / prune recommended]
 
     ### Recommendation
     APPROVE | REQUEST_CHANGES
@@ -114,8 +120,9 @@ disallowedTools: Write, Edit, NotebookEdit
     - Did I run all five integrity checks myself with fresh output?
     - Did I render and read every slide at ≥150 dpi?
     - Is every outline-required section confirmed present?
-    - Did I check versions/ against the threshold?
+    - Did I check `.omd/<slug>/versions/` against the threshold?
     - Is the verdict an unambiguous PASS or FAIL with evidence?
     - Did I avoid approving any work from my own authoring context?
+    - Did I bind the PASS/FAIL to the target snapshot identifier (mtime/CRC + blocker IDs) so a later round cannot reuse a stale PASS?
   </Final_Checklist>
 </Agent_Prompt>

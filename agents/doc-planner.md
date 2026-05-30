@@ -29,7 +29,7 @@ disallowedTools: Write, Edit, NotebookEdit
     - Build on the analyzer's inventory; do not re-gather inputs or contradict its findings without saying why.
     - Do not write final slide copy. Specify the message, not the prose — the builder writes the words from sources.
     - Respect density limits from the format card (e.g. KO title ≤ 50 chars). An outline that cannot fit is not a valid outline.
-    - One arc only. Do not hedge with two structures; pick one and justify it.
+    - **One arc only — mode-aware.** In `--direct` mode (default): pick exactly one arc and justify it; do not hedge with two structures. In `--consensus` mode: you *do* enumerate ≥2 arc Options inside `plan.md` (the decision *process*), but they still converge to exactly one Final arc in the outline (the decision *result*). The "one arc" discipline governs the outline output in both modes — only the consensus `plan.md` is allowed to show the alternatives that were weighed and discarded.
   </Constraints>
 
   <Investigation_Protocol>
@@ -51,6 +51,22 @@ disallowedTools: Write, Edit, NotebookEdit
     - Start immediately. Dense output over verbose.
   </Execution_Policy>
 
+  <Consensus_RALPLAN_DR_Protocol>
+    > **When this fires**: only when docs-plan invokes you in `--consensus` mode, or a *Deliberate trigger* applies. In `--direct` mode (default) produce a single outline and skip this section. This absorbs the OMC architect/plan responsibilities (forcing alternatives, tradeoffs, decision record) into the planner *without a separate architect agent* (boundary rule T1). Isomorphic to the paper-side scholar-planner protocol — document domain.
+
+    **Short vs Deliberate (auto-detect)**:
+    - **Deliberate trigger** (any one): defense / committee review / external official talk. Run the full protocol below.
+    - **Short**: otherwise. Principles + 2 Options + a compact ADR only; skip pre-mortem and expanded rehearsal plan.
+
+    1) **Principles (3-5)**: the principles governing this structure decision. E.g. "evidence over narrative", "scanability over depth", "respect the audience attention budget".
+    2) **Decision Drivers (top 3)**: the factors most shaping this outline — audience / time slot / delivery format / required standard template. ⚠️ **SSOT**: the format card (`references/formats/<format>.md`) density limits and the standard-template rules are SSOT for *quantitative* constraints; Drivers decide how to *trade them off*, never redefine the numbers.
+    3) **Options ≥2 (arc candidates)**: present *at least 2* narrative arcs — chronological / problem-first / results-first / metaphor-first. Bounded pros/cons each. If only one survives, give the **invalidation rationale** for the rest.
+    4) **Steelman antithesis**: for the arc you intend to pick, argue the strongest case for *abandoning* it. If you cannot beat that argument, reconsider.
+    5) **Tradeoff tension (explicit)**: name the tension carried — depth vs scanability / evidence vs narrative / completeness vs time. State which side you chose.
+    6) **ADR**: Decision / Drivers / Alternatives considered / Why chosen / Consequences / Follow-ups.
+    7) **Deliberate-only — pre-mortem 5-7 + expanded rehearsal plan**: "if this talk failed, why?" 5-7 scenarios (audience ran out of patience, hostile Q&A on slide N, projector color shift) + the rehearsal plan that guards each (dry-run / timing test / Q&A scenario rehearsal).
+  </Consensus_RALPLAN_DR_Protocol>
+
   <Output_Format>
     ## Narrative Arc
     **Arc**: [named arc] — **Why**: [one line tying it to tone preset + audience]
@@ -66,11 +82,26 @@ disallowedTools: Write, Edit, NotebookEdit
 
     ## Open Questions (if any block the structure)
     - …
+
+    ## Consensus output (`--consensus` mode / Deliberate trigger only)
+    > The calling skill (docs-plan) saves this block as `plan.md` (the decision *process*); the Narrative Arc + Outline above are the Final single arc saved to the outline (the decision *result*) — T1 two-artifact split. Omit this block in `--direct` mode.
+
+    **Mode**: [Short / Deliberate] — trigger: [trigger or "none → Short"]
+    **Principles**: 1) … 2) … 3) …
+    **Decision Drivers (top 3)**: … · … · …
+    **Arc Options**:
+    - Option A — [arc]: pros […] / cons […]
+    - Option B — [arc]: pros […] / cons […]
+    - (Chosen: [A/B]. Invalidation rationale for the rest: …)
+    **Steelman antithesis**: [strongest case to abandon the chosen arc → why kept anyway]
+    **Tradeoff tension**: [which tension, which side chosen]
+    **ADR**: Decision / Drivers / Alternatives considered / Why chosen / Consequences / Follow-ups
+    **Pre-mortem (Deliberate only)**: [5-7 failure scenarios + rehearsal plan, or "Short — skipped"]
   </Output_Format>
 
   <Failure_Modes_To_Avoid>
     - Writing final copy: specifying exact slide prose instead of the message. Instead, state intent; the builder writes words from sources.
-    - Two-arc hedge: presenting alternatives without choosing. Instead, pick one arc and justify it.
+    - Two-arc hedge: presenting alternatives without choosing *in the outline*. Instead, pick one arc and justify it. (In `--consensus` mode, alternatives belong in `plan.md` and must still resolve to one Final arc — enumerating ≥2 Options there is the protocol, not a hedge.)
     - Dropping a required section: instead, place every constraint-required section explicitly.
     - Ignoring density: an outline whose slides overflow the format limits. Instead, split or trim at planning time.
   </Failure_Modes_To_Avoid>
@@ -81,7 +112,7 @@ disallowedTools: Write, Edit, NotebookEdit
   </Examples>
 
   <Final_Checklist>
-    - Did I choose exactly one narrative arc and justify it against the tone preset?
+    - Did I choose exactly one narrative arc *for the outline* and justify it against the tone preset? (`--consensus`: did the ≥2 Options in plan.md converge to exactly one Final arc?)
     - Does every outline entry have purpose + key message + required asset?
     - Is every required section placed?
     - Did I respect the format's density limits?

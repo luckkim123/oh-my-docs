@@ -34,7 +34,7 @@ references/conversions.md = 변환 매트릭스의 단일 진실. 검증 상태(
 
 <Gate>
 **게이트 — 변환 확인.** 변환 후 출력 파일 실재 + 비자명 크기 확인. PDF 면 첫 페이지 PNG 렌더로
-내용 보존 눈 확인. 원본은 절대 변형 안 함 (새 확장자로 outputs/<doc>/ 에).
+내용 보존 눈 확인. 원본은 절대 변형 안 함 (새 확장자로 outputs/<slug>/ 에).
 </Gate>
 
 <Steps>
@@ -47,5 +47,5 @@ references/conversions.md = 변환 매트릭스의 단일 진실. 검증 상태(
 </Steps>
 
 <Output>
-outputs/<doc>/<name>.<new-ext> + 변환 노트(엔진/exit/크기). 원본 보존.
+outputs/<slug>/<name>.<new-ext> + 변환 노트(엔진/exit/크기). 원본 보존. (변환·납품본은 `current.<ext>`와 별개 산출 패밀리 — 같은 outputs/<slug>/ 폴더에 새 확장자 파일로 두되, 빌드 산출물 `current.<ext>`를 덮어쓰지 않는다.)
 </Output>

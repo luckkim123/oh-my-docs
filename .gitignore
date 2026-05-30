@@ -1,5 +1,9 @@
 .DS_Store
 __pycache__/
+*.pyc
+
+# runtime work area — per-document, not committed (version snapshots, renders, intermediates)
+.omd/
 
 # runtime document outputs — never commit user documents (large, private)
 outputs/*
