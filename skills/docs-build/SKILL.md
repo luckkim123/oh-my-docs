@@ -39,10 +39,10 @@ description: |
 <Steps>
 1. doc-builder 를 dispatch (아웃라인 + analyzer/standardize 의 design system 전달):
    `Task(subagent_type="oh-my-docs:doc-builder", ...)`
-2. builder 가 카드를 읽고 → (revision 이면) versions/ 스냅샷 → 빌드 스크립트 → 산출 → 수식(VERIFIED 경로) → 자체 PNG sanity 렌더.
-3. 산출물(outputs/<doc>/current.<ext>) + sanity PNG 를 게이트 2 로 제시 → 확인.
+2. builder 가 카드를 읽고 → (revision 이면) `.omd/<slug>/versions/` 스냅샷 → 빌드 스크립트 → 산출 → 수식(VERIFIED 경로) → 자체 PNG sanity 렌더(`.omd/<slug>/renders/current/`).
+3. 산출물(outputs/<slug>/current.<ext>) + sanity PNG 를 게이트 2 로 제시 → 확인.
 </Steps>
 
 <Output>
-outputs/<doc>/current.<ext> + versions/ 스냅샷(큰 수정 시) + builder 빌드 노트. inspect/verify 로 넘김.
+사용자가 보는 최종본은 `outputs/<slug>/current.<ext>` 하나. 버전 스냅샷(큰 수정 시)·sanity 렌더·빌드 노트는 작업장 `.omd/<slug>/`(`versions/`·`renders/current/`·`build-notes.md`)에. 경로 규약은 `references/output-layout.md`가 SSOT. inspect/verify 로 넘김.
 </Output>

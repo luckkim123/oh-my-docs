@@ -1,0 +1,104 @@
+"""Tests for the document-routing UserPromptSubmit hook (route_emit.py).
+
+핵심 계약: 문서 작업이면 매 턴 FORMAT+STAGE 판정을 응답 맨 앞(omha ROUTE 줄
+다음)에 출력하라는 contract 를 주입한다. omha 의 ROUTE(LANE)·oms 의 STAGE(paper)
+와 레이블이 구분되고, 수식은 카드 VERIFIED 경로만이라는 단서가 박혀야 한다.
+stdlib only, fail-open.
+
+isomorphic 출처: oh-my-scholar/tests/test_scholar_route_emit.py (도메인만 docs).
+OMD 는 tests/ 가 없었으므로 hook 계약 회귀를 위해 신설(T14)."""
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+HOOK = Path(__file__).parent.parent / "hooks" / "route_emit.py"
+
+
+def run_hook(payload: dict) -> str:
+    """훅을 서브프로세스로 실행하고 stdout 반환."""
+    proc = subprocess.run(
+        [sys.executable, str(HOOK)],
+        input=json.dumps(payload),
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, f"hook exited {proc.returncode}: {proc.stderr}"
+    return proc.stdout
+
+
+def context_of(stdout: str) -> str:
+    if not stdout.strip():
+        return ""
+    return json.loads(stdout)["hookSpecificOutput"]["additionalContext"]
+
+
+def test_emits_userpromptsubmit_context():
+    """① UserPromptSubmit 이벤트로 라우팅 contract 주입."""
+    out = run_hook({"prompt": "이 PDF로 디펜스 발표자료 만들어줘"})
+    d = json.loads(out)
+    assert d["hookSpecificOutput"]["hookEventName"] == "UserPromptSubmit"
+
+
+def test_context_states_stage_emit_contract():
+    """② 매 턴 FORMAT+STAGE 한 줄 판정 contract 가 명시돼야 (omha ROUTE 와 동형)."""
+    out = context_of(run_hook({"prompt": "이 슬라이드 검토해줘"}))
+    assert "STAGE(docs) →" in out
+    assert "누락 금지" in out  # 매 턴 출력 의무
+
+
+def test_context_lists_all_stages():
+    """③ 8개 단계가 contract 에 모두 열거돼야 (skill 과 정합).
+
+    revise 는 docs-revise 스킬이 실재하므로 STAGE 카탈로그에 포함돼야 한다
+    (T14 에서 누락을 수정). pilot 은 docs-pilot 로 표기."""
+    out = context_of(run_hook({"prompt": "문서 작업"}))
+    for stage in ("intake", "standardize", "plan", "build",
+                  "inspect", "verify", "revise", "docs-pilot"):
+        assert stage in out, f"stage '{stage}' missing from contract"
+
+
+def test_context_lists_formats():
+    """④ 세 포맷(pptx/docx/hwpx)이 contract 에 열거돼야 — STAGE 줄에 FORMAT 슬롯."""
+    out = context_of(run_hook({"prompt": "발표자료"}))
+    for fmt in ("pptx", "docx", "hwpx"):
+        assert fmt in out, f"format '{fmt}' missing from contract"
+
+
+def test_context_states_format_card_authority():
+    """⑤ 수식·함정의 단일 진실 = references/formats/<format>.md 카드라는 단서."""
+    out = context_of(run_hook({"prompt": "수식 들어간 docx"}))
+    assert "references/formats" in out
+    assert "VERIFIED" in out  # 수식은 카드가 VERIFIED 표시한 경로만
+
+
+def test_context_states_consensus_rationale():
+    """⑥ Deliberate(디펜스·심사·외부 공식) → docs-plan --consensus 단서가 박혀야 (T14)."""
+    out = context_of(run_hook({"prompt": "심사 발표자료"}))
+    assert "--consensus" in out
+    assert "Deliberate" in out
+
+
+def test_stage_label_distinct_from_paper_and_lane():
+    """⑦ omd 레이블(STAGE(docs))이 oms(STAGE(paper))·omha(ROUTE)와 달라
+    한 화면에 같이 떠도 구분 가능. 이모지 미사용."""
+    out = context_of(run_hook({"prompt": "문서"}))
+    assert "STAGE(docs)" in out       # omd 전용 레이블
+    assert "STAGE(paper)" not in out  # oms 레이블과 충돌 없음
+    assert "ROUTE →" not in out       # omha 레인 레이블과 충돌 없음
+    assert "📑" not in out and "📄" not in out and "🧭" not in out
+
+
+def test_stdlib_only_no_third_party_imports():
+    """⑧ stdlib only — 외부 의존 없이 import 성공 가능 (a test enforces this)."""
+    src = HOOK.read_text()
+    assert "import json" in src and "import sys" in src
+    assert "import a2a" not in src and "import requests" not in src
+
+
+def test_fail_open_on_bad_input():
+    """⑨ fail-open: 잘못된 입력에도 exit 0, 세션 안 막음."""
+    proc = subprocess.run(
+        [sys.executable, str(HOOK)],
+        input="not json at all", capture_output=True, text=True,
+    )
+    assert proc.returncode == 0

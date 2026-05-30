@@ -49,5 +49,5 @@ description: |
 </Steps>
 
 <Output>
-outputs/<doc>/<name>_<lang>.<ext> + 사실 보존 대조표(원문↔재목적화 수치/출처/주장 일치). 원문 보존.
+outputs/<slug>/<name>_<lang>.<ext> + 사실 보존 대조표(원문↔재목적화 수치/출처/주장 일치). 원문 보존. (재목적화본은 `current.<ext>`와 별개 산출 패밀리 — 같은 outputs/<slug>/ 폴더에 언어 접미사 파일로, `current.<ext>`를 덮어쓰지 않는다.)
 </Output>

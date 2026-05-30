@@ -20,4 +20,6 @@ Hancom equation (HML equation objects). python-hwpx support scope is **unresearc
 investigate before writing the formula section. Do not guess.
 
 ## Version-snapshot policy
-Same `outputs/<doc>/{current, versions/, thumbnails/, manifest.json}` convention.
+Same layout as the pptx card: the one delivered `outputs/<slug>/current.hwpx`, with version
+snapshots and renders in the `.omd/<slug>/` work area (`versions/`, `renders/`, `tmp/`). See
+`references/output-layout.md` for the fixed structure and naming.

@@ -41,7 +41,7 @@ description: |
 <Steps>
 1. 현재 상태 진단: `Task(subagent_type="oh-my-docs:doc-verifier", ...)` → FAIL 항목 목록. 직전 회차 결함을 기록(같은 결함 반복 추적용).
 2. **루프**:
-   a. 수정: `Task(subagent_type="oh-my-docs:doc-builder", ...)` — FAIL 항목만 (versions/ 스냅샷은 큰 수정 시).
+   a. 수정: `Task(subagent_type="oh-my-docs:doc-builder", ...)` — FAIL 항목만 (`.omd/<slug>/versions/` 스냅샷은 큰 수정 시).
    b. 재검증: `Task(subagent_type="oh-my-docs:doc-verifier", ...)` — fresh 무결성 5/5 + 전수 정독.
    c. acceptance criteria 4개 *전부* 충족 → 종료(PASS). 하나라도 미달이면 같은 결함 반복 여부 확인:
       - 같은 결함 3회째 → 멈추고 "fundamental issue" 보고.
@@ -51,6 +51,6 @@ description: |
 </Steps>
 
 <Output>
-PASS 받은 outputs/<doc>/current.<ext> + 반복 이력(각 회차 FAIL→수정 요지) + 최종 verify 증거표.
+PASS 받은 outputs/<slug>/current.<ext>(사용자가 보는 단 하나) + 반복 이력(각 회차 FAIL→수정 요지) + 최종 verify 증거표. 버전 스냅샷은 `.omd/<slug>/versions/`.
 또는 stop 보고(같은 결함 3회 / 최대 반복 초과 + 남은 결함).
 </Output>

@@ -35,7 +35,7 @@ verified. Formula rendering proven (matplotlib-image path VERIFIED via soffice; 
 PowerPoint-only). docx/hwpx are stub cards — build logic clones after the pptx pilot is validated
 end-to-end in a live session.
 
-Design: `/Users/kimseungmin/Desktop/workspace/00-09_Meta/02_Decisions/2026-05-28-oh-my-docs-redesign-stage-centric.md`
+Design: the stage-centric redesign decision doc (maintained in the author's planning notes, outside this repo).
 
 ## Prerequisites
 

@@ -46,7 +46,7 @@ def build_reminder() -> str:
         "- 산출 후 docs-verify 로 무결성 5/5(zip CRC·엔진 파싱·soffice·dangling rels·orphan master) "
         "+ 전수 정독을 확인할 것. 형성적 개선점은 docs-inspect.\n"
         "- ⚠️ '열리는 것 같다'는 검증이 아니다 — fresh 렌더 증거 없이 done 선언 금지. "
-        "원본 in-place 수정 금지(outputs/<doc>/current + versions/ 스냅샷).\n"
+        "원본 in-place 수정 금지(최종본은 outputs/<slug>/current 하나, 버전 스냅샷은 .omd/<slug>/versions/).\n"
         "- pptx/docx/hwpx 포맷 원형 유지(임의 변환 금지). 수식은 카드가 VERIFIED 표시한 경로만."
     )
 
