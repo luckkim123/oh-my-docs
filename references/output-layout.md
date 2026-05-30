@@ -89,6 +89,9 @@ outputs/<slug>/
   tmp/
     *                                 # soffice pdf / pdftoppm intermediates — disposable anytime
   build-notes.md                      # (optional) builder notes — for Claude's analysis
+
+.omd/wiki/                            # project-wide accrual — NOT per-job (sibling of <slug>/, carries across sessions)
+  convention/  decision/  reference/  # auto-appended defect patterns / style specs / decisions (see references/wiki/README.md)
 ```
 
 ### 2.1 Invariance rules

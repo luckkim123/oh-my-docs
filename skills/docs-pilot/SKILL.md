@@ -48,7 +48,11 @@ description: |
    - build 수정 루프와 병렬 (spec≠quality 분리).
 6. **docs-verify** → doc-verifier dispatch: 무결성 5/5 + 전수 정독.       ──[게이트 3: 최종]
    - FAIL → 4번(build)으로 되돌림.
-7. **terminal cleanup** (verify PASS + 게이트 3 사용자 최종 확인 후, 또는 사용자가 "정리해줘"/"작업 끝" 명시 시):
+7. **wiki capture (자동 특화 — 쓸수록 이 프로젝트/이 발표 유형에 맞춰짐)**: inspect/verify가 이번 세션에 *발견한* 재사용 가능한 패턴을 **작업 대상 프로젝트의 `.omd/wiki/<category>/*.md`**(plugin이 아니라 프로젝트 작업장; `.omd/`는 gitignore)에 **자동 append**한다 (승인 불필요 — 가벼운 채널). 이것이 다음 세션 doc-inspector의 pre-commitment `wiki_query(category)`가 읽는 데이터 — 쓰기와 읽기가 닫혀 하네스를 쓸수록 이 발표 유형·이 조직 표준에 특화된다. (작업장이라 plugin 배포물·다른 프로젝트를 오염시키지 않고, marketplace update에도 안 날아간다.)
+   - **무엇을 적재**: ① 발표 유형별 반복 결함 패턴 → `convention/<type>-defect-patterns.md`(예: defense=contribution 흐림·ablation 부재) ② standardize가 귀납한 공통 양식(폰트·컬러·여백) → `convention/<org>-style-spec.md` ③ 이번에 택한 arc·청중 프레이밍의 근거 → `decision/<slug>.md`. inspector/verifier·standardize가 실제로 본 것만 — 추측 적재 금지.
+   - **append 형식**: 기존 .md 끝에 한 줄(또는 짧은 항목) 추가. 같은 패턴이 이미 있으면 중복 안 적음(grep 선확인). 새 category 파일은 자유 형식 .md(머신 스키마 없음).
+   - **자동이되 비파괴**: append-only(기존 줄 안 지움), 부재 디렉토리는 생성, 적재할 게 없으면 그냥 통과(빈 세션 OK). 적재·조회 모두 **결정론적 텍스트만, 임베딩 금지**. 사용자가 `--no-wiki`면 skip. 계약·경계는 `references/wiki/README.md` 참조.
+8. **terminal cleanup** (verify PASS + 게이트 3 사용자 최종 확인 후, 또는 사용자가 "정리해줘"/"작업 끝" 명시 시):
    - `.omd/<slug>/`의 정리 대상 **집계**(크기·개수): `renders/`·`gen-image/`·`tmp/` 전부 + `versions/`의 최신 1개·사용자 지정 이정표를 **제외한** 구버전. 이정표 선택을 위해 versions 목록을 사용자에게 보여준다.
    - **AskUserQuestion [정리 / 유지]** — 자동 삭제 절대 없음, 기본값 보수적(유지).
    - "정리" 선택 시 → **복구 가능 경로로 삭제**(영구 `rm` 금지): macOS `trash`(없으면 `~/.Trash` 이동) / Linux `gio trash`·`trash-cli` / Windows PowerShell 휴지통 이동(`Shell.Application` ParseName+InvokeVerb('delete'), 영구 `Remove-Item` 금지 — documented, unverified) / 휴지통 없는 환경(CI·컨테이너)은 "영구 삭제" 사용자 재확인 후에만.
