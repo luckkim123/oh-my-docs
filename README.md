@@ -40,13 +40,31 @@ Design: the stage-centric redesign decision doc (maintained in the author's plan
 ## Prerequisites
 
 python-pptx, **python-docx**, LibreOffice (soffice), pdftoppm (poppler), matplotlib + Pillow.
-macOS / Windows document environments (Linux is skipped — not a document-authoring target).
 
 ```sh
+# Python packages (all platforms)
 pip install python-pptx python-docx matplotlib Pillow
-brew install --cask libreoffice  # soffice
-brew install poppler             # pdftoppm
 ```
+
+LibreOffice (`soffice`) and poppler (`pdftoppm`) are the only native dependencies — install via your
+platform's package manager:
+
+```sh
+# macOS (Homebrew)
+brew install --cask libreoffice && brew install poppler
+
+# Debian/Ubuntu
+sudo apt install libreoffice poppler-utils
+
+# Fedora/RHEL
+sudo dnf install libreoffice poppler-utils
+
+# Windows (winget; or choco install libreoffice poppler)
+winget install TheDocumentFoundation.LibreOffice
+```
+
+The runtime itself is cross-platform (the format cards and cleanup logic branch macOS/Linux/Windows).
+`.hwp` conversion is the one exception — it needs Windows + Hancom COM (see `references/formats/hwpx.md`).
 
 (python-docx is wired but the docx build path is stub-level until the pptx pilot ships
 end-to-end.)
