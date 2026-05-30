@@ -51,7 +51,7 @@ description: |
 7. **terminal cleanup** (verify PASS + 게이트 3 사용자 최종 확인 후, 또는 사용자가 "정리해줘"/"작업 끝" 명시 시):
    - `.omd/<slug>/`의 정리 대상 **집계**(크기·개수): `renders/`·`gen-image/`·`tmp/` 전부 + `versions/`의 최신 1개·사용자 지정 이정표를 **제외한** 구버전. 이정표 선택을 위해 versions 목록을 사용자에게 보여준다.
    - **AskUserQuestion [정리 / 유지]** — 자동 삭제 절대 없음, 기본값 보수적(유지).
-   - "정리" 선택 시 → **복구 가능 경로로 삭제**(영구 `rm` 금지): macOS `trash`(없으면 `~/.Trash` 이동) / Linux `gio trash`·`trash-cli` / 휴지통 없는 환경(CI·컨테이너)은 "영구 삭제" 사용자 재확인 후에만.
+   - "정리" 선택 시 → **복구 가능 경로로 삭제**(영구 `rm` 금지): macOS `trash`(없으면 `~/.Trash` 이동) / Linux `gio trash`·`trash-cli` / Windows PowerShell 휴지통 이동(`Shell.Application` ParseName+InvokeVerb('delete'), 영구 `Remove-Item` 금지 — documented, unverified) / 휴지통 없는 환경(CI·컨테이너)은 "영구 삭제" 사용자 재확인 후에만.
    - ⚠️ `outputs/<slug>/current.<ext>`(사용자 자산)는 집계·삭제 대상에서 **제외** — 언급만. 상세 절차는 `references/output-layout.md` §5.
 
 > **`--from <stage>` 진입점**: 중간 단계부터 시작 가능 — `intake|standardize|plan|build|inspect|verify`. intake의 topology/모호성 판정은 `--from intake`에 포함.

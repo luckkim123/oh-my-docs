@@ -181,6 +181,10 @@ order = version number order = sort order, always.
 3. On "clean" → **delete via a recoverable path** (never permanent `rm`). Environment-adaptive:
    - macOS: use the `trash` CLI if present, else move to `~/.Trash`
    - Linux desktop: `gio trash` / `trash-cli`
+   - Windows: send to the Recycle Bin via PowerShell
+     (`powershell -c "(New-Object -ComObject Shell.Application).Namespace(0).ParseName('<abs-path>').InvokeVerb('delete')"`),
+     or the `recycle-bin` / `trash` module if installed; never `Remove-Item` permanently
+     (documented; unverified on Windows)
    - no-trash environment (CI / container / minimal): confirm "permanent delete" with the user
      explicitly before any `rm`
 4. Verify what remains (latest 1 version + milestones still present).
