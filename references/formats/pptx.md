@@ -11,9 +11,15 @@
 | Tool | Role | Verified on this machine (2026-05-28) |
 |:---|:---|:---|
 | `python-pptx` 1.0.2 | create / edit shapes, text, layout | ✓ installed |
-| `soffice` (LibreOffice) | .pptx → .pdf for rendering | ✓ `/opt/homebrew/bin/soffice` |
-| `pdftoppm` | .pdf → .png (visual proofread) | ✓ `/opt/homebrew/bin/pdftoppm` |
+| `soffice` (LibreOffice) | .pptx → .pdf for rendering | resolve on PATH (`command -v soffice` / Windows `where soffice`) |
+| `pdftoppm` | .pdf → .png (visual proofread) | resolve on PATH (`command -v pdftoppm` / Windows `where pdftoppm`) |
 | `matplotlib` 3.9.4 + `Pillow` 11.3 | LaTeX math → PNG (formula path B) | ✓ installed |
+
+> **Cross-platform tool resolution**: never hardcode an absolute binary path — resolve at run time.
+> macOS/Linux: `command -v soffice` / `command -v pdftoppm`.
+> Windows: `where soffice` (default `C:\Program Files\LibreOffice\program\soffice.exe`);
+> `pdftoppm` ships with poppler (`where pdftoppm`, or via `winget install`/`choco install poppler`).
+> If a tool is absent, stop and tell the user how to install it — do not silently skip the render/verify gate. (Windows paths documented, unverified on this machine.)
 
 **Render-to-PNG recipe** (used by verify/inspect for proofreading):
 ```bash
