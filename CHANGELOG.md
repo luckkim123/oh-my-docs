@@ -9,6 +9,25 @@ All notable changes to oh-my-docs (omd).
 
 ## [Unreleased]
 
+### Added
+- **2계층 wiki — `wiki_query` 계약을 로컬+전역 ascent 병합으로 확장** (oms `e47ab44` 의
+  2계층 ascent wiki 를 omd 도메인으로 ADAPT backport). `wiki_query(category)` 구현이 로컬
+  `.omd/wiki/` + 가장 가까운 상위 `.omd/wiki/`(전역 레벨, ascent 로 발견 — git 의 `.git` 찾기
+  방식)를 병합하고 `[wiki:local]`/`[wiki:global]` 출처 태깅한다. ⚠️ **호출부 시그니처 불변** —
+  ascent·병합·태깅은 전부 추상함수 구현 안에 갇혀 `doc-inspector` pre-commitment 는 한 줄도 안
+  바뀐다(미래 MCP 교체점도 그대로). 절대경로·env·XDG 0개(work-root 상대). 상위 `.omd/` 부재 시
+  graceful 빈 목록. 갱신: `references/wiki/README.md`·`references/learning-protocol.md`(§1.4
+  "Two wiki levels" 신설)·`agents/doc-inspector.md`·`skills/docs-pilot/SKILL.md`(Step 7)·
+  `skills/docs-learn/SKILL.md`(§4b 로컬→전역 승급 경로). 회귀가드 `tests/test_wiki_two_level.py`.
+  ⚠️ **omd 도메인 변형(oms 통째복사 아님)**: ① oms 전역 전용 `history/` 카테고리 **드롭**(omd 엔
+  init·문서-dedup 수요 없어 dead) ② oms 의 citation 전역금지 → omd 는 **document content
+  (text·claims·numbers·sources) 전역 영구금지**(§6.F content-preservation 의 전역 확장) ③ **cross-
+  project 기밀 격리 게이트 신설**(oms 무 — 전역 wiki 는 다중 프로젝트 공유라 식별가능한 프로젝트 고유
+  content 는 전역금지·로컬만, 추상 form 규칙만 승급, `docs-learn` §4b 가 스크럽 강제).
+- **`docs-learn` 를 plugin.json skills 에 등록** (드리프트 수정): 디스크엔 있으나 plugin.json
+  미등록이라 배포 시 로드 안 되던 것을 보정(2계층 wiki 의 로컬→전역 승급 소유 스킬이라 누락 시
+  §4b 가 dead ship). 회귀가드 `tests/test_plugin_integrity.py` 로 skills↔디렉토리 1:1 드리프트 차단.
+
 ### Changed
 - **`references/omc-backport-analysis.md` §4 신설 — omp 0.2.0 역방향 backport 검토(채택 0).**
   형제 omp 가 0.2.0 에 추가한 5종(content_conventions·content audit·dead-link·CONVENTIONS.md·

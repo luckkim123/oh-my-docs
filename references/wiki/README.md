@@ -14,21 +14,32 @@ It is the current backing for the `wiki_query(category)` abstract function, and 
 
 ⚠️ **The data accrues in the work area (`.omd/wiki/`) — NOT in this plugin repo.** This README is the *contract*, so it ships inside the plugin (`references/wiki/README.md`), but the accumulated data is written to **`.omd/wiki/` under the target project root** (`.omd/` is gitignored — it never dirties the plugin/distributable and diverges per project, which is what makes "specializes to *this* project" hold). Same pattern as OMC's `.omc/wiki/` (project-local).
 
+### ⭐ Two levels — local (this project) + global (parent `.omd/`, found by ascent)
+
+`.omd/wiki/` lives at **two levels**. Both are cwd-relative — **no absolute path, no env var, no XDG** (omd's "relative to the work root" philosophy from `output-layout.md`, so the distributable is never dirtied):
+
 ```
-<project root>/.omd/wiki/          ← work area, gitignored, diverges per project (carries across sessions)
-  convention/   *.md   ← per-type defect patterns + induced style specs (inspector reads this) — ⭐ source of heavy-channel candidates
-  pattern/      *.md   ← ⭐NEW: how the user *works* (disposition) — light only, never promoted
-    work-profile.md      ← what they mostly do / which deck types ("you mostly make defense decks, reports")
-    working-style.md     ← how they work (reviews closing slide first, prefers diagram-heavy)
-    preferences.md       ← tone/verbosity preferences (dislikes verbose, prefers direct)
-  decision/     *.md   ← past decisions (why this arc, why this audience framing, what worked well)
-  reference/    *.md   ← pointers to external resources (brand guide, accessibility rubric)
+<documents' parent folder>/.omd/wiki/   ← ⭐ GLOBAL level — assets this *user/org* reuses across every document
+  convention/   *.md   ← org/lab standard style-spec + per-type form rules (reused across docs) — scope = global | <type-key>
+  pattern/      *.md   ← disposition (favored phrasing/layout/working-style/preferences) — light only
+  decision/     *.md   ← reusable decisions ("defense decks always lead with the contribution slide")
+        ▲  discovery = ascent (cwd→parent, the nearest ancestor .omd/, excluding self; git's .git-lookup)
+        │
+<project root>/.omd/wiki/                ← LOCAL level — specific to THIS document project (outside <slug>/, carries across sessions)
+  convention/   *.md   ← this project's defect patterns + induced style specs (inspector reads this) — ⭐ source of heavy-channel candidates
+  pattern/      *.md   ← (usually empty — disposition collects at the global level)
+  decision/     *.md   ← this project's decisions (why this arc, why this audience framing)
+  reference/    *.md   ← this project's pointers to external resources (brand guide, accessibility rubric)
 ```
 
 - One file = one topic (e.g. `convention/defense-defect-patterns.md`, `convention/lab-style-spec.md`).
 - Each file is free-form human-readable .md. No machine-parse schema (grep only).
-- `category` maps 1:1 to the **four** sub-directory names above.
+- `category` maps 1:1 to the sub-directory names (local: `convention`·`pattern`·`decision`·`reference`; global: `convention`·`pattern`·`decision`).
 - ⚠️ `.omd/wiki/` is *project-wide* accrual, so it lives **outside** the per-job `.omd/<slug>/` (output-layout) — it is not tied to a slug and survives across sessions/jobs.
+- ⚠️ **Only "document-agnostic reusable form assets" rise to global** (org/lab style-spec, disposition, reusable decisions). Project-specific knowledge (this deck's defect quirks) stays local, and ⚠️ **a document's content (text, claims, numbers, sources) is *permanently forbidden* from rising to global** (the content-preservation invariant — `learning-protocol.md` §6.F, the omd analogue of oms's citation-safety). This is how the "never to a distributed/user-scope config" anti-pattern is reconciled — the global level is *the parent folder's `.omd/`* (still work-root-relative), not a distributed config, and only form assets cross up.
+- ⚠️ **Cross-project confidentiality gate (omd-specific, no oms analogue).** The global level is *shared by multiple document projects* — and a workspace may hold confidential company material. A global-eligible note must carry only the **abstracted form rule** ("captions are 12pt black"), never a **project-identifiable** detail (client name, internal codename, a confidential path). A rule like "the ACME deck uses red captions" stays **local** — promoting it to global would leak it into an unrelated (personal/external) project's session via ascent. Form abstracts; identifiers stay local. (`learning-protocol.md` §1.4 / §6.F.)
+
+> ⚠️ The global-only `history/` category that the sibling oms harness carries (for its `init` to relate/dedup new *papers*) is **intentionally not present** in omd — omd has no `init` stage and no document-dedup need, so it would be a dead category here.
 
 ### ⭐ `convention/` vs `pattern/` — heavy-channel candidates come from convention only (2026-05-31 H6 backport)
 
@@ -68,9 +79,16 @@ sightings: 3
 wiki_query(category) → list of matched .md excerpts (empty list if none)
 ```
 
-- **Current implementation**: **deterministic grep** (keyword matching, incl. CJK bi-gram) over the target project's `.omd/wiki/<category>/`. The caller (inspector) greps by presentation-type / disposition keywords to pull relevant excerpts. category is one of the four (`convention`·`pattern`·`decision`·`reference`). (Missing directory → empty list — a fresh project starts from an empty store.)
-- **Caller/implementation boundary (future swap point)**: the inspector calls an *abstract function* `wiki_query`; it does not know whether the implementation is grep or a standalone MCP. If a standalone wiki MCP is later adopted, **swap only this function's implementation** (grep → MCP) — the call sites (inspector pre-commitment) do not change.
-- **Graceful degrade on absence**: if the store is empty or the directory is missing, return an empty list — not an error. The inspector proceeds on its own prediction.
+- **Current implementation (two-level ascent merge)**:
+  ```
+  local_hits  = grep(<cwd>/.omd/wiki/<category>/, keywords)              # local — this document project
+  parent_omd  = ascent(<cwd>): cwd→parent, the first .omd/ excluding self  # git's .git-lookup
+  global_hits = grep(parent_omd/wiki/<category>/, keywords) if parent_omd else []  # global — user/org reuse
+  return merge(local_hits, global_hits)   # provenance-tagged [wiki:local] / [wiki:global]
+  ```
+  Deterministic grep only (keyword matching, incl. CJK bi-gram). The caller (inspector) greps by presentation-type / disposition keywords to pull relevant excerpts. category for the local level is one of the four (`convention`·`pattern`·`decision`·`reference`); the global level carries `convention`·`pattern`·`decision` (no `history` — see layout above). (Either level — missing directory → that level is an empty list; a fresh project starts from an empty store.)
+- **Caller/implementation boundary (future swap point)**: the inspector calls an *abstract function* `wiki_query`; it does not know whether the implementation is "two-level grep" or a standalone MCP. **The ascent, the merge, and the provenance-tagging are all sealed inside this function** — the call site (inspector pre-commitment) does not change by a single line. If a standalone wiki MCP is later adopted, swap only this function's implementation.
+- **Graceful degrade on absence**: if either the local or the global level is empty, or there is no ancestor `.omd/`, that level returns an empty list — not an error. The inspector proceeds on what exists (or on its own prediction).
 
 ---
 

@@ -50,6 +50,27 @@ human gate.
    but still passes the human gate.
 4. **scope**: record as `global` (universal habit) vs `<style-key>` (this deck-type only). Never
    promote across the wrong scope.
+   - ⚠️ **Two different "global" axes — do not conflate.** This `scope: global` is a *style-spec
+     applicability* label (the default applies to every deck-type, vs one `<style-key>`). It is a
+     **different axis** from the wiki's local↔global *storage-location* tier in §4b below. A rule
+     can be `scope: global` yet still live only in the *local* `.omd/wiki/`, and vice-versa.
+4b. **local→global wiki promotion (separate path, the storage-location axis)** — distinct from the
+   `scope` label above, light-channel assets may be promoted by *physical storage location* from
+   the local `.omd/wiki/` up to the *parent folder's `.omd/wiki/`* (the global tier, found by
+   ascent — `references/wiki/README.md`). At a project's end, a reusable asset (`pattern/`
+   disposition, `convention/` org-or-type form rule, `decision/`) may, **after human approval**, be
+   copied to the ancestor `.omd/wiki/<category>/`. Rules:
+   - Only *document-agnostic reusable* form assets rise — this project's own defect quirks stay local.
+   - ⚠️ **content (text·claims·numbers·sources) is permanently forbidden from the global tier**
+     (heavy or light — `learning-protocol.md` §6.F·§1.4), the omd analogue of oms's citation-safety.
+   - ⚠️ **cross-project confidentiality scrub (omd-specific)**: the global tier is shared by multiple
+     document projects that may hold confidential material, so a promoted note must carry only the
+     **abstracted form rule** ("captions are 12pt black"), never a **project-identifiable** detail
+     (client name, internal codename, confidential path). "The ACME deck uses red captions" stays
+     **local**. Scrub identifiers before any global copy (`learning-protocol.md` §1.4·§6.F).
+   - Human gate required — no auto-promotion. `pattern/` stays permanently light even at the global
+     tier (recalled, never enforced). If there is no ancestor `.omd/`, advise the user to init one
+     in the documents' parent folder (never create it in the parent/home unasked).
 5. **judgment ≠ approval**: doc-inspector only *judges* (read-only); only a human *approves*. No
    self-approval in the same context.
 
@@ -69,6 +90,11 @@ human gate.
    - update the `specificity` / `origins` / `learned_refs` meta (per `learning-protocol.md` §4 formula).
    - mark the OBS `status: candidate→promoted`, record `promoted_to`.
 5. Rejected candidates → `status: rejected` + reason.
+6. **(optional) local→global wiki promotion** — if a just-promoted (or already-local) light asset
+   is reusable across documents (§4b), present it at the **same human gate**: "copy this to the
+   global `.omd/wiki/` (parent folder, reused by every project)?". On approval, scrub project
+   identifiers + verify content 0, then copy to the ancestor `.omd/wiki/<category>/`. No ancestor
+   `.omd/` → advise, do not auto-create. Skipped silently if nothing is reuse-worthy.
 
 ## Output
 

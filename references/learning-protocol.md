@@ -123,6 +123,46 @@ preference about how omd handles *their documents* — in ANY turn:
 4. **Do it without being asked.** Document knowledge goes to *this harness's* `.omd/`, never to
    a distributed/user-scope config.
 
+### 1.4 Two wiki levels — local (this document project) vs global (parent `.omd/`)
+
+The light channel `wiki/` exists at **two levels**, both `.omd/`-relative (no absolute path,
+no env var, no XDG — preserves "never to a distributed/user-scope config" above):
+
+- **Local** = `<cwd>/.omd/wiki/` — knowledge specific to *this document project* (its defect
+  patterns, its decisions). Stays with the project.
+- **Global** = the nearest **ancestor `.omd/wiki/`** found by ascent (cwd → parent, first
+  `.omd/` excluding self; git's `.git`-lookup pattern) — assets this *user/org* reuses across
+  **every** document. Discovered, not configured: when the user runs from a documents-parent
+  folder (e.g. their workspace), that folder's `.omd/` is the global level.
+
+**What may rise to global** (the only things that leak upward — this is how the anti-pattern is
+honored, not violated): reusable **form** assets only —
+
+| category | global-eligible | why |
+|:---|:---:|:---|
+| `pattern/` (disposition: phrasing·layout·working-style·preferences) | ✅ light-only, never enforced | identity, doesn't change per document |
+| `convention/` (org/lab style-spec, per-type form rules; scope `global \| <type-key>`) | ✅ via human gate (§6.B) | reused across documents |
+| `decision/` (reusable decisions: "defense decks always lead with the contribution slide") | ✅ | meta-decisions across documents |
+| this project's defect quirks / framing | ❌ stays local | project-specific, not reusable |
+| **document content (text · claims · numbers · sources)** | ❌ **permanently forbidden** | content-preservation — §6.F invariant, never promoted to global (omd analogue of oms's citation-safety) |
+
+The global level is *the parent folder's `.omd/`* (still work-root-relative), **not** a
+distributed config — and only reusable form assets cross up. Project-specific knowledge stays
+local and document content is forbidden. `wiki_query` merges both levels
+(`references/wiki/README.md`), tagging `[wiki:local]`/`[wiki:global]`; the call site never changes.
+
+⚠️ **Cross-project confidentiality gate (omd-specific — oms has no analogue).** The global level is
+*shared by multiple document projects*, and any one of them may hold confidential material (a
+client deck, an internal report). So a global-eligible note must carry only the
+**abstracted form rule** ("captions are 12pt black"), never a **project-identifiable** detail
+(client name, internal codename, a confidential path). "The ACME deck uses red captions" stays
+**local** — promoting it would leak it into an unrelated project's session via ascent. Form
+abstracts up; identifiers stay local. (`docs-pilot` only *hints* at promotion at terminal; the
+actual local→global copy + identifier scrub is performed by `docs-learn` §4b through the human
+gate — see `skills/docs-learn/SKILL.md` and §6.F.) The global-only `history/` category that oms
+carries (for its `init`) is **not present** in omd — no `init` stage, no document-dedup need, so
+it would be a dead category here.
+
 ---
 
 ## 2. The `learned.md` observation format (heavy-channel staging)
@@ -289,6 +329,13 @@ are allowed. And learning never licenses distorting a source document's facts/nu
 (the content-preservation guardrail omd's translate/convert stages already enforce). Form
 specializes; content is preserved verbatim. This is omd's load-bearing invariant — the
 analogue of oms's citation-safety.
+
+This invariant extends to the **two-level wiki** (§1.4): document content is **permanently
+forbidden from rising to the global level**, and a global-eligible note must be the abstracted
+form rule, never a project-identifiable detail (client name, codename, confidential path) — the
+**cross-project confidentiality gate**, since the global level is shared by multiple document
+projects that may include confidential material. Identifiers stay local; only abstracted form
+crosses up.
 
 ---
 

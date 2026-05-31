@@ -52,6 +52,7 @@ description: |
    - **무엇을 적재**: ① 발표 유형별 반복 결함 패턴 → `convention/<type>-defect-patterns.md`(예: defense=contribution 흐림·ablation 부재) ② standardize가 귀납한 공통 양식(폰트·컬러·여백) → `convention/<org>-style-spec.md` ③ 이번에 택한 arc·청중 프레이밍의 근거 → `decision/<slug>.md`. inspector/verifier·standardize가 실제로 본 것만 — 추측 적재 금지.
    - **append 형식**: 기존 .md 끝에 한 줄(또는 짧은 항목) 추가. 같은 패턴이 이미 있으면 중복 안 적음(grep 선확인). 새 category 파일은 자유 형식 .md(머신 스키마 없음).
    - **자동이되 비파괴**: append-only(기존 줄 안 지움), 부재 디렉토리는 생성, 적재할 게 없으면 그냥 통과(빈 세션 OK). 적재·조회 모두 **결정론적 텍스트만, 임베딩 금지**. 사용자가 `--no-wiki`면 skip. 계약·경계는 `references/wiki/README.md` 참조.
+   - **⚠️ 2계층 — append는 로컬에만, 전역은 hint만**: 자동 append는 항상 **로컬** `.omd/wiki/`(이 프로젝트)에만 쓴다(가벼운 채널). 조회(`wiki_query`)는 로컬 + 상위 `.omd/wiki/`(전역, ascent)를 병합해 읽는다. **전역 승급 후보 hint (terminal에서만)**: 파이프라인 종료 시, 이번에 로컬에 쌓인 것 중 *다음 문서에도 재사용각*인 자산(성향·조직/유형 양식·재사용 결정)이 보이면 "이건 상위 `.omd/`(전역)로 올려둘까요?"를 사용자에게 **권유**한다 — 실제 승급은 `docs-learn`의 로컬→전역 경로(§4b, 사람 게이트)가 수행하고, 그 단계에서 ⚠️ **content 0(문서 텍스트·수치·주장 전역 영구금지) + 프로젝트 식별자 스크럽**(고객명·내부 코드네임·기밀 경로 제거, 추상 form 규칙만 — "캡션 12pt 검정"은 OK, "ACME deck은 캡션 빨강"은 로컬)을 강제한다. pilot은 권유만 — 자동 승급 없음. 근거: `skills/docs-learn/SKILL.md` §4b, `references/learning-protocol.md` §1.4·§6.F (cross-project 기밀 격리).
 8. **terminal cleanup** (verify PASS + 게이트 3 사용자 최종 확인 후, 또는 사용자가 "정리해줘"/"작업 끝" 명시 시):
    - `.omd/<slug>/`의 정리 대상 **집계**(크기·개수): `renders/`·`gen-image/`·`tmp/` 전부 + `versions/`의 최신 1개·사용자 지정 이정표를 **제외한** 구버전. 이정표 선택을 위해 versions 목록을 사용자에게 보여준다.
    - **AskUserQuestion [정리 / 유지]** — 자동 삭제 절대 없음, 기본값 보수적(유지).
