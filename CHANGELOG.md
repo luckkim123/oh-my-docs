@@ -10,6 +10,13 @@ All notable changes to oh-my-docs (omd).
 ## [Unreleased]
 
 ### Changed
+- **`references/omc-backport-analysis.md` §4 신설 — omp 0.2.0 역방향 backport 검토(채택 0).**
+  형제 omp 가 0.2.0 에 추가한 5종(content_conventions·content audit·dead-link·CONVENTIONS.md·
+  specificity content 항)을 omd 로 역방향 backport 할지 적대 검증(omd 실소스 대조) → 전부 REJECT.
+  omd 는 바이너리 office 산출물 생성 파이프라인이라 rules.json 정규식 audit 루프·body/frontmatter
+  scope 가 referent 상실, content 검증은 PPTEval 3축 rubric 이 담당. specificity content 항은 omd
+  가 §3 제외표·learning-protocol §5 H6("no numeric weighted sum")에서 *이미 명시 거부*한 범주.
+  "역방향 채택 0" 을 영속 기록해 재검토 반복 방지. 코드 변경 0 — 문서만.
 - **xlsx 포맷을 라우팅 hook 계약에 추가** (`hooks/route_emit.py`, UserPromptSubmit): FORMAT
   슬롯이 `pptx|docx|hwpx` 뿐이라 xlsx 작업이 라우팅에 인지되지 않던 것을 수정 →
   `pptx|docx|xlsx|hwpx`. 본문 포맷 목록·STAGE 줄 양쪽 갱신. 회귀테스트
