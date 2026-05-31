@@ -41,11 +41,11 @@ Design: the stage-centric redesign decision doc (maintained in the author's plan
 
 ## Prerequisites
 
-python-pptx, **python-docx**, LibreOffice (soffice), pdftoppm (poppler), matplotlib + Pillow.
+python-pptx, **python-docx**, **python-hwpx**, LibreOffice (soffice), pdftoppm (poppler), matplotlib + Pillow.
 
 ```sh
 # Python packages (all platforms)
-pip install python-pptx python-docx matplotlib Pillow
+pip install python-pptx python-docx python-hwpx matplotlib Pillow
 ```
 
 LibreOffice (`soffice`) and poppler (`pdftoppm`) are the only native dependencies — install via your
@@ -66,8 +66,11 @@ winget install TheDocumentFoundation.LibreOffice
 ```
 
 The runtime itself is cross-platform (the format cards and cleanup logic branch macOS/Linux/Windows).
-`.hwp` conversion is the one exception — it needs Windows + Hancom COM (see `references/formats/hwpx.md`).
+`.hwpx` is fully in-process via python-hwpx on every platform; the one exception is the **`.hwp`
+binary** (older v5 OLE) — it cannot be written in pure Python and is a normalize-to-hwpx/docx
+conversion gate only (see `references/formats/hwpx.md`).
 
 (python-docx is wired and the docx format card is complete; the build path is exercised after the
-pptx pilot ships end-to-end. xlsx uses openpyxl/xlsxwriter — `pip install openpyxl xlsxwriter` when
-building spreadsheets.)
+pptx pilot ships end-to-end. python-hwpx is wired and the hwpx format card is complete — form-fill is
+the main use case, math is unsupported/v2. xlsx uses openpyxl/xlsxwriter — `pip install openpyxl
+xlsxwriter` when building spreadsheets.)

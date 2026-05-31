@@ -34,7 +34,7 @@ description: |
 - pptx → references/formats/pptx.md (python-pptx, 수식 = matplotlib PNG only[soffice가 OMML 미렌더], 버전 스냅샷)
 - docx → references/formats/docx.md (python-docx, 수식 2경로[OMML 편집가능 VERIFIED + matplotlib 폴백], 헤더/PAGE 필드/한글폰트 함정)
 - xlsx → references/formats/xlsx.md (openpyxl/xlsxwriter 라우팅, `<v>0</v>` 수식캐시 함정, 구조검증 게이트[PNG 정독 아님])
-- hwpx → references/formats/hwpx.md (stub)
+- hwpx → references/formats/hwpx.md (python-hwpx[순수 Python, in-process], 양식채우기 3단 폴백[fill_by_path→`{{}}`→자유텍스트] = 메인, 검증[HwpxDocument.validate() XSD + 패키지검증 CLI], 수식 = 미지원[v2, 읽기 시 조용히 누락], `.hwp` = 정규화 게이트만, soffice hwpx 렌더 UNVERIFIED, 이 머신 import 미실측)
 </Format_Knowledge>
 
 <Steps>
