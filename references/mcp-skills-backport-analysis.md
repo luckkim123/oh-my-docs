@@ -67,6 +67,14 @@ source-available 라 코드/패턴을 직접 대조했다. **단 omd 와 다른 
 | M5 | docx tracked-changes / 단락삭제 규율 | docx 카드 "기존 docx 편집" 절: 저자=Claude, paragraph mark `<w:del/>`, comment.py 예외 | 소스 확인 |
 | M6 | xlsx 엔진 분업(openpyxl/xlsxwriter) | xlsx 카드 라우팅 규칙 = 신규=xlsxwriter, 수정=openpyxl(차트 load 손실 경고) | adv holds + 실측 |
 | M7 | route_emit 포맷 카탈로그 | `hooks/route_emit.py` 에 **xlsx 포맷 토큰 추가**(STAGE 줄 + 본문). 회귀테스트 `test_context_lists_formats` 에 xlsx 추가 | 11/11 green |
+| M8 | xlsx **재무모델 작성 규약** (color-coding/숫자포맷/수식구성) | xlsx 카드 "Financial-model authoring conventions" 절 신설: 셀 역할별 색(파랑=입력/검정=수식/초록=시트간링크/빨강=외부참조/노랑배경=핵심가정), 숫자포맷(연도=텍스트, 음수=괄호, 0=`-`, 배수=0.0x), **"수식은 셀에, python 하드코딩 금지"** 원칙(M3 `<v>0</v>` 트랩의 양성 규칙), 하드코딩 시 source 주석, 사전 참조 sanity check | 공식 SKILL 직접대조 (2026-06-01 재스캔) |
+
+> **2026-06-01 재스캔 메모**: anthropics/skills live repo(docx/pptx/xlsx/pdf SKILL.md) 직접 fetch 대조.
+> 신규 채택은 M8 **1건**뿐 — 나머지는 M1~M7 기채택이거나 의도적 제외(docx-js/pptxgenjs Node 엔진,
+> markitdown, pptx OMML)로 확인. **pptx 덱 디자인 규칙**(dominance 60-70%, 모티프 반복, 제목 밑줄
+> 금지)은 가치 있으나 omd 의 pptx 작업이 mckinsey-pptx 템플릿으로 가므로 그쪽 관할 → 보류. **pdf
+> 스킬**(pypdf/pdfplumber/reportlab/OCR/forms)은 실재하나 omd 는 pdf 를 *출력 검증 산출물*로만 다뤄
+> pdf *저작* 은 도메인 밖 → 카드 신설 안 함(필요 시 공식 pdf 스킬 직접 참조).
 
 ### 제외 (exclude — 사유 포함)
 

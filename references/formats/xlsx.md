@@ -64,6 +64,47 @@ Spreadsheets do not proofread by "render every page to image" — print paginati
   ```
   (`SAL_USE_VCLPLUGIN=svp` for headless; sandbox socket shim per anthropics/skills `office/soffice.py`.)
 
+## Financial-model authoring conventions (when the deliverable is a model, not just a sheet)
+
+The engine/verify sections above are *mechanism*; this section is the *content standard* for
+financial models, budgets, and any analytical workbook a reader will audit. Borrowed from the
+anthropics/skills xlsx convention set (2026-06-01) — pure prescriptions, no engine dependency, so
+they apply whether `doc-builder` writes via xlsxwriter or openpyxl. Skip for throwaway data dumps;
+apply whenever a human will trace the numbers.
+
+**Formulas live in cells, never in Python (load-bearing):**
+- **Write Excel formulas (`=SUM(...)`, `=(C4-C2)/C2`, `=AVERAGE(...)`), do NOT compute the number in
+  Python and hardcode the result.** A model's logic *is* its content — a hardcoded `=12345` cannot be
+  audited, re-run on changed inputs, or trusted. This is the positive rule behind the `<v>0</v>` trap
+  above: write the formula string, then recalc via the LibreOffice macro to populate real values.
+- **All assumptions in named/separate cells** (growth rates, margins, multiples), and reference those
+  cells from formulas — never inline a magic number inside a formula. One input cell, many references.
+- **A genuine hardcode (an external input) gets a source comment**: `Source: [system], [date],
+  [reference], [URL if any]` (e.g. "Source: SEC EDGAR 10-K, 2025-03, Item 8"). Distinguishes a
+  sourced input from an un-auditable guess.
+
+**Color code by cell role** (Excel financial-modeling standard, unless the user specifies otherwise):
+
+| Cell role | Format |
+|:---|:---|
+| Hardcoded input / scenario parameter | **blue** text (RGB 0,0,255) |
+| Formula / calculation | **black** text (RGB 0,0,0) |
+| Cross-worksheet link | **green** text (RGB 0,128,0) |
+| External-file reference | **red** text (RGB 255,0,0) |
+| Key assumption needing attention | **yellow** fill (RGB 255,255,0) |
+
+**Number formats** (so the sheet reads like a model, not a raw dump):
+- Years as text (`"2024"`, not `2,024` with a thousands separator).
+- Currency `$#,##0`; state units in the header (`Revenue ($mm)`), not per cell.
+- Zeros shown as `-` (including in percentage columns).
+- Percentages default to `0.0%` (one decimal); multiples as `0.0x` (e.g. EV/EBITDA).
+- Negatives in parentheses `(123)`, not a leading minus.
+
+**Pre-build reference sanity check** (cheap, catches whole-model breakage): test 2-3 cell references
+before building the full model — confirm column-letter mapping (column 64 = `BL`), Excel's 1-indexed
+rows vs. any DataFrame 0-indexing, and cross-sheet ref format (`Sheet1!A1`). Verify gate target after
+recalc: **zero formula errors** (`#REF!`/`#DIV/0!`/`#VALUE!`/`#N/A`/`#NAME?`).
+
 ## Hard traps
 
 - **Never edit in place.** openpyxl `load → save(same path)` overwrites silently → output ≠ input,
