@@ -1,56 +1,56 @@
 ---
 name: docs-revise
 description: |
-  기존 문서를 verify PASS 받을 때까지 수정-검증 루프 — 작업중 문서를 "통과까지 고쳐줘". build 수정과
-  verify 검증을 fresh 증거로 반복, 같은 결함 3회 반복이면 멈추고 보고(ralph 패턴의 문서판). 독립 진입.
+  Fix-verify loop on an existing document until it gets a verify PASS — "fix it until it passes" for the document in progress. Repeats build fixes and
+  verify checks with fresh evidence; if the same defect recurs 3 times, stops and reports (the document counterpart of the ralph pattern). Standalone entry.
   Triggers: 통과까지 고쳐, 문제 다 잡아줘, 계속 고쳐, 검증 통과할 때까지, 반복 수정,
   revise until pass, fix until verified, 수정 루프, 다 고쳐줘
 ---
 
-# docs-revise — 수정-검증 루프 (ralph 문서판)
+# docs-revise — Fix-Verify Loop (document counterpart of ralph)
 
 <Purpose>
-기존 문서를 verify 가 PASS 줄 때까지 수정한다. doc-builder(수정)와 doc-verifier(검증)를 fresh 증거로 반복 — "do your best" 가 아니라 *통과 보장*. OMC ralph 의 문서판.
+Fixes an existing document until verify gives a PASS. Repeats doc-builder (fixes) and doc-verifier (verification) with fresh evidence — not "do your best" but a *guaranteed pass*. The document counterpart of OMC ralph.
 </Purpose>
 
 <Use_When>
-- 작업중/완성 문서를 "verify 통과까지 알아서 고쳐줘" 할 때
-- docs-verify 가 FAIL 냈고 그 수정을 자동 루프로 돌리고 싶을 때
-- 사용자가 "다 잡아줘", "통과할 때까지" 류
+- When you want an in-progress/finished document "fixed automatically until it passes verify"
+- When docs-verify returned FAIL and you want to run those fixes in an automatic loop
+- When the user says things like "catch them all", "until it passes"
 </Use_When>
 
 <Do_Not_Use_When>
-- 새 문서를 만드는 거면 → docs-build (또는 docs-pilot)
-- 개선점 조언만 원하면 → docs-inspect (수정 안 함)
-- citation-bound 문서면 → 자동 루프 금지 (내용 변조 위험), 단일 신중 수정
+- If you're creating a new document → docs-build (or docs-pilot)
+- If you only want improvement advice → docs-inspect (does not modify)
+- If it's a citation-bound document → no automatic loop (risk of altering content), apply careful single fixes
 </Do_Not_Use_When>
 
 <Execution_Policy>
-- **통과(passes)의 정의 — ralph 의 `passes:true` 문서판.** 아래 acceptance criteria 가 *전부* 충족돼야 PASS. 하나라도 미달이면 미통과(부분 PASS 없음):
-  1. 무결성 5/5 (zip CRC · 엔진 파싱 · soffice convert · dangling rels · orphan master) — 4/5 는 FAIL.
-  2. 전수 PNG 정독 (≥150dpi, 모든 슬라이드/페이지 텍스트 읽힘, 변경 안 한 슬라이드도).
-  3. outline 필수 섹션 전부 present.
-  4. 직전 회차 FAIL 결함이 재현되지 않음.
-- 각 반복: doc-builder 수정 → doc-verifier 가 fresh 증거로 검증 (이전 검증 재사용 금지).
-- **scope 축소·placeholder 채움·검사 우회로 PASS 만들지 말 것** (ralph: no scope reduction, no deleting tests).
-- builder 와 verifier 는 다른 lane — self-approval 금지.
-- **같은 결함이 3회 반복되면 멈추고 보고** (fundamental issue — 무한 루프 차단).
-- **boulder never stops(부드러운 연장):** 기본 최대 5회. 5회째에 결함이 *줄고 있고* 같은 결함 3회 반복이 아니면, 한 번에 한해 +3회 연장 가능(사용자 통지). 진전이 없으면 연장 없이 멈추고 보고 — 무한 루프 금지.
+- **Definition of pass — the document counterpart of ralph's `passes:true`.** The acceptance criteria below must *all* be satisfied for a PASS. If any one falls short, it is not passed (no partial PASS):
+  1. Integrity 5/5 (zip CRC · engine parse · soffice convert · dangling rels · orphan master) — 4/5 is a FAIL.
+  2. Full PNG read-through (≥150dpi, text readable on every slide/page, including slides that were not changed).
+  3. All required outline sections present.
+  4. The FAIL defect from the previous round does not recur.
+- Each iteration: doc-builder fixes → doc-verifier verifies with fresh evidence (no reuse of prior verification).
+- **Do not manufacture a PASS by reducing scope, filling placeholders, or bypassing checks** (ralph: no scope reduction, no deleting tests).
+- builder and verifier are different lanes — no self-approval.
+- **If the same defect recurs 3 times, stop and report** (fundamental issue — block the infinite loop).
+- **boulder never stops (soft extension):** default maximum 5 rounds. On the 5th round, if defects are *decreasing* and it is not the same defect recurring 3 times, you may extend +3 rounds once only (notify the user). If there is no progress, stop and report without extending — no infinite loop.
 </Execution_Policy>
 
 <Steps>
-1. 현재 상태 진단: `Task(subagent_type="oh-my-docs:doc-verifier", ...)` → FAIL 항목 목록. 직전 회차 결함을 기록(같은 결함 반복 추적용).
-2. **루프**:
-   a. 수정: `Task(subagent_type="oh-my-docs:doc-builder", ...)` — FAIL 항목만 (`.omd/<slug>/versions/` 스냅샷은 큰 수정 시).
-   b. 재검증: `Task(subagent_type="oh-my-docs:doc-verifier", ...)` — fresh 무결성 5/5 + 전수 정독.
-   c. acceptance criteria 4개 *전부* 충족 → 종료(PASS). 하나라도 미달이면 같은 결함 반복 여부 확인:
-      - 같은 결함 3회째 → 멈추고 "fundamental issue" 보고.
-      - 최대 반복 도달 → boulder 연장 조건(결함 감소 中) 충족 시 1회 +3 연장, 아니면 멈추고 보고.
-      - 그 외 → 이번 회차 FAIL 결함을 기록하고 (a)로.
-3. PASS(criteria 4/4) 또는 stop 조건에서 종료, 회차별 이력 + 최종 verify 증거표 제시.
+1. Diagnose current state: `Task(subagent_type="oh-my-docs:doc-verifier", ...)` → list of FAIL items. Record the previous round's defects (to track recurrence of the same defect).
+2. **Loop**:
+   a. Fix: `Task(subagent_type="oh-my-docs:doc-builder", ...)` — FAIL items only (snapshot to `.omd/<slug>/versions/` for large fixes).
+   b. Re-verify: `Task(subagent_type="oh-my-docs:doc-verifier", ...)` — fresh integrity 5/5 + full read-through.
+   c. All 4 acceptance criteria satisfied → terminate (PASS). If any one falls short, check whether it is the same defect recurring:
+      - Same defect 3rd time → stop and report "fundamental issue".
+      - Max iterations reached → if the boulder extension condition (defects decreasing) is met, extend +3 once, otherwise stop and report.
+      - Otherwise → record this round's FAIL defect and go back to (a).
+3. Terminate on PASS (criteria 4/4) or a stop condition, presenting the per-round history + final verify evidence table.
 </Steps>
 
 <Output>
-PASS 받은 outputs/<slug>/current.<ext>(사용자가 보는 단 하나) + 반복 이력(각 회차 FAIL→수정 요지) + 최종 verify 증거표. 버전 스냅샷은 `.omd/<slug>/versions/`.
-또는 stop 보고(같은 결함 3회 / 최대 반복 초과 + 남은 결함).
+The PASS'd outputs/<slug>/current.<ext> (the single one the user sees) + iteration history (each round's FAIL → fix summary) + final verify evidence table. Version snapshots in `.omd/<slug>/versions/`.
+Or a stop report (same defect 3 times / max iterations exceeded + remaining defects).
 </Output>

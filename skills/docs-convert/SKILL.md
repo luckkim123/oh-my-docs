@@ -1,51 +1,50 @@
 ---
 name: docs-convert
 description: |
-  문서 포맷·납품본 변환 단계 — .pptx/.docx→배포 PDF, .md→docx, .hwp→hwpx 정규화 게이트.
-  렌더 엔진(soffice/pandoc)을 조율할 뿐 변환기를 새로 짜지 않는다. 검증된 경로만 사용,
-  미검증은 명시. 단계중심(포맷은 변수).
+  Document format / deliverable conversion stage — .pptx/.docx→distribution PDF, .md→docx, .hwp→hwpx normalization gate.
+  It only orchestrates render engines (soffice/pandoc); it does not write a new converter. Uses verified paths only,
+  flags the unverified explicitly. Stage-centric (format is a variable).
   Triggers: PDF로 변환, 납품본, 변환해줘, pptx를 pdf로, hwp 변환, 포맷 바꿔,
   convert document, export pdf, to pdf, 배포용
 ---
 
-# docs-convert — 포맷/납품본 변환 (단계)
+# docs-convert — format/deliverable conversion (stage)
 
 <Purpose>
-완성 문서를 다른 포맷·납품본으로 변환한다. .pptx/.docx → 배포 PDF, .md → docx, .hwp → hwpx 정규화. 변환기를 새로 짜지 않고 검증된 엔진(soffice/pandoc)을 조율 — references/conversions.md 가 어느 변환이 검증됐는지의 단일 진실.
+Convert a finished document into another format or deliverable. .pptx/.docx → distribution PDF, .md → docx, .hwp → hwpx normalization. It does not write a new converter; it orchestrates verified engines (soffice/pandoc) — references/conversions.md is the single source of truth for which conversions are verified.
 </Purpose>
 
 <Use_When>
-- 완성 deck/문서를 배포 PDF 로 뽑을 때
-- .hwp 입력을 OMD 가 다룰 수 있는 hwpx/docx 로 정규화할 때 (변환 게이트)
-- .md 초안을 .docx 로 올릴 때
+- Exporting a finished deck/document to a distribution PDF
+- Normalizing a .hwp input into hwpx/docx that OMD can handle (conversion gate)
+- Promoting a .md draft to .docx
 </Use_When>
 
 <Do_Not_Use_When>
-- 새 문서를 *만드는* 거면 → docs-build
-- .hwp 를 직접 *수정/쓰기* 하려는 거면 → 불가 (macOS 순수 파이썬 한계). 정규화 게이트만.
+- If you are *creating* a new document → docs-build
+- If you want to directly *edit/write* a .hwp → not possible (macOS pure-Python limitation). Normalization gate only.
 </Do_Not_Use_When>
 
 <Conversion_Knowledge>
-references/conversions.md = 변환 매트릭스의 단일 진실. 검증 상태(VERIFIED/UNVERIFIED/GATE) 확인 후 사용:
-- **.pptx → .pdf** = VERIFIED ✓ (soffice). 배포본 기본 경로.
-- **.hwp → hwpx/docx** = GATE (macOS 순수 파이썬 불가, 수동 export). 직접 쓰기 금지.
-- 나머지는 UNVERIFIED — 첫 사용 시 실제 변환+출력 확인 후 매트릭스 갱신.
+references/conversions.md = single source of truth for the conversion matrix. Use only after checking the verification status (VERIFIED/UNVERIFIED/GATE):
+- **.pptx → .pdf** = VERIFIED ✓ (soffice). Default path for deliverables.
+- **.hwp → hwpx/docx** = GATE (not possible with macOS pure Python, manual export). Direct writing prohibited.
+- Everything else is UNVERIFIED — on first use, run the actual conversion + verify the output, then update the matrix.
 </Conversion_Knowledge>
 
 <Gate>
-**게이트 — 변환 확인.** 변환 후 출력 파일 실재 + 비자명 크기 확인. PDF 면 첫 페이지 PNG 렌더로
-내용 보존 눈 확인. 원본은 절대 변형 안 함 (새 확장자로 outputs/<slug>/ 에).
+**Gate — conversion check.** After conversion, confirm the output file exists + has a non-trivial size. For a PDF, eyeball content preservation by rendering the first page to PNG. Never mutate the original (write to outputs/<slug>/ under the new extension).
 </Gate>
 
 <Steps>
-1. references/conversions.md 에서 요청 변환의 상태 확인. GATE/불가면 사용자에게 알리고 멈춤.
-2. doc-builder 를 dispatch (변환 = 엔진 구동이므로 builder lane):
-   `Task(subagent_type="oh-my-docs:doc-builder", ...)`  — "convert, not author" 명시.
-3. builder 가 검증 경로로 변환 → 출력 파일 실재+크기 확인.
-4. (PDF) 첫 페이지 렌더로 내용 보존 확인 → 게이트 제시.
-5. 새로 검증된 변환이면 conversions.md 매트릭스 갱신 (VERIFIED ✓).
+1. Check the requested conversion's status in references/conversions.md. If GATE/not possible, notify the user and stop.
+2. Dispatch doc-builder (conversion = driving an engine, so it is the builder lane):
+   `Task(subagent_type="oh-my-docs:doc-builder", ...)`  — state "convert, not author" explicitly.
+3. The builder converts via the verified path → confirm the output file exists + its size.
+4. (PDF) Confirm content preservation by rendering the first page → present the gate.
+5. If this is a newly verified conversion, update the conversions.md matrix (VERIFIED ✓).
 </Steps>
 
 <Output>
-outputs/<slug>/<name>.<new-ext> + 변환 노트(엔진/exit/크기). 원본 보존. (변환·납품본은 `current.<ext>`와 별개 산출 패밀리 — 같은 outputs/<slug>/ 폴더에 새 확장자 파일로 두되, 빌드 산출물 `current.<ext>`를 덮어쓰지 않는다.)
+outputs/<slug>/<name>.<new-ext> + a conversion note (engine/exit/size). Original preserved. (Conversions/deliverables are a separate output family from `current.<ext>` — keep them in the same outputs/<slug>/ folder as new-extension files, but do not overwrite the build artifact `current.<ext>`.)
 </Output>

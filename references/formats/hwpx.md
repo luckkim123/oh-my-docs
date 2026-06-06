@@ -54,7 +54,7 @@
 
 ## Form filling — 3-tier auto-detect fallback (MAIN use case)
 
-Korean office forms (공문서) are the primary target. The user hands you a form; OMD **detects the
+Korean office forms (공문서, official documents) are the primary target. The user hands you a form; OMD **detects the
 fill mechanism at run time** (no need to pre-declare it). Detection is OMD's job; substitution is the
 library's. Log which tier was taken.
 
