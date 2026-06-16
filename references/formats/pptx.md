@@ -95,6 +95,22 @@ pdftoppm -png -r 150 <deck.pdf> <dir>/slide   # ≥150 dpi — low dpi hides ove
   these; build fresh shapes instead.
 - **Orphan slideMaster** triggers the PowerPoint "repair" dialog even when the file opens in
   soffice. Integrity check must catch dangling relationships and orphan masters (see verify card).
+- **Slide-extract / deck-merge → dangling reference in `presentation.xml` IdLst → repair dialog**
+  `[VERIFIED ✓ — 2026-06-17]`: when you carve N slides out of a deck (or merge two decks) by deleting
+  parts, the **inverse of the orphan-master trap** bites — you remove a `notesMaster1.xml` / theme /
+  layout part *and its rels entry*, but leave the **pointer to it still inside `presentation.xml`**.
+  The classic culprit is `<p:notesMasterIdLst><p:notesMasterId r:id="rIdN"/></p:notesMasterIdLst>`
+  surviving after notesMaster is dropped: `presentation.xml` now references `rIdN` which no longer
+  exists in `presentation.xml.rels` → PowerPoint repair. **soffice, python-pptx, and `unzip -t` all
+  open it fine** — only PowerPoint enforces the pointer↔target closure, so a clean soffice render is
+  NOT clearance (same authority rule as the namespace-ghost trap). Two more closures break the same
+  way and must be checked together: (a) `[Content_Types].xml` `<Override>` whose PartName was deleted
+  (e.g. a pruned `theme2.xml`), (b) `<p:sldLayoutId r:id>` in `slideMaster1.xml` pointing at a layout
+  you removed. **Fix**: when dropping a notesMaster/handout/theme/layout, also strip its IdLst block
+  from `presentation.xml` (`re.sub(r'<p:notesMasterIdLst>.*?</p:notesMasterIdLst>','',pres,flags=DOTALL)`)
+  AND its `[Content_Types]` Override AND its master sldLayoutId. **Do not fix-one-and-declare** — the
+  first round here fixed only the theme2 Override and the dialog recurred; the real cause was the
+  notesMasterIdLst. On recurrence, stop guessing and run the full closure scan below.
 - **Unescaped `&` (or `<`) in injected text → repair dialog + render dropout** `[VERIFIED ✓ — 2026-05-28]`:
   when you build new run text yourself (not copied from an existing run), raw `&` / `<` / `>` break
   XML parsing. Symptom is twofold and easy to misread: (1) **PowerPoint shows the "repair" dialog**,
@@ -114,6 +130,19 @@ pdftoppm -png -r 150 <deck.pdf> <dir>/slide   # ≥150 dpi — low dpi hides ove
   (4) `Presentation(file)` opens via python-pptx (same OPC parser class as PowerPoint), (5) edited
   parts still have `[Content_Types].xml` Overrides. Both repair-dialog traps above pass CRC but fail
   checks 2–4 — those are what actually predict the PowerPoint repair prompt.
+- **Closure scan (5-way) — mandatory after any extract/merge/prune** `[VERIFIED ✓ — 2026-06-17]`:
+  the gate above is slide-part-centric and misses the IdLst/Override dangles that fire the repair
+  dialog on extract/merge. Add these five, each must be **zero**: (1) every `Target` in every `.rels`
+  resolves to an existing part (normalize paths; top `_rels/.rels` base = `''`; skip `TargetMode="External"`/`http`);
+  (2) every in-body `r:(embed|link|id)="rIdN"` across all `ppt/**.xml` is defined in that part's own
+  `_rels`; (3) every `[Content_Types].xml` `<Override PartName>` exists AND every packaged part's
+  extension is covered by a `<Default>` or `<Override>` (remove a dead Override with
+  `<Override\b[^>]*/>` matching the whole tag, then test PartName — `[^/]*` breaks on the `/` inside
+  the ContentType value); (4) every `r:id` used in `presentation.xml` — **including `sldId`,
+  `notesMasterIdLst`, `handoutMasterIdLst`** — is in `presentation.xml.rels`, and `sldId` ids/rIds are
+  unique; (5) every `<p:sldLayoutId r:id>` in each `slideMaster` resolves in that master's rels.
+  Then `lxml.etree.fromstring` every `.xml`/`.rels` (regex edits can unbalance tags). Authority rule
+  still holds: these predict the repair prompt, but the user's PowerPoint is final ground truth.
 - **AlternateContent (Choice/Fallback)**: a shape can have two XML representations; editing only
   one leaves them inconsistent. Inspect both branches.
 - **Copied-shape namespace ghost → PowerPoint render dropout** `[VERIFIED ✓ — 2026-05-28]`:
