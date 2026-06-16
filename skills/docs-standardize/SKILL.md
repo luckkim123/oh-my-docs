@@ -21,9 +21,13 @@ Analyze several existing documents to inductively extract the *common* standard 
 </Use_When>
 
 <Do_Not_Use_When>
-- When there is no existing document to reference → skip (build uses the default tone preset)
+- When there is **no** existing document to reference at all → skip (build uses the default tone preset)
 - When analyzing just a single document/page is enough → use doc-analyzer directly (no induction needed)
 </Do_Not_Use_When>
+
+<Mandatory_When>
+**⚠️ When a template/sample is supplied, this stage is NON-SKIPPABLE (mandatory).** If the user provides a master template (a .pptx etc. with real layouts) or a sample to follow, you MUST, before build, extract that template's **layout/placeholder map** (layout index and name; each placeholder's idx, type, inherited font, and number style) and hand it to the builder. Do this even for a single template (N=1 to induce) — this is not "inducing a common standard" but "the layout blueprint the builder will clone", so it is needed even at N=1. This map is the data `references/formats/pptx.md` "Building on a master template" presupposes. Going straight to build without the map → the builder hand-draws on blank slides → the template is wholesale ignored (2026-06-16 v1–v3).
+</Mandatory_When>
 
 <Gate>
 **Gate — extraction scope + round-trip.** Confirm which documents count as the standard population → after extraction,

@@ -10,6 +10,22 @@ All notable changes to oh-my-docs (omd).
 ## [Unreleased]
 
 ### Added
+- **Build-time format-regression defense — pptx card API traps + post-build shape-assertion gate + standardize enforcement**
+  (response to the 2026-06-16 herolab 5-fail format audit). Audit conclusion: omd's safety leans not on gates but
+  on "the fidelity of the card the builder reads", yet `pptx.md` was silent on python-pptx **high-level API traps**
+  (sibling `docx.md` already holds the equivalent `paragraph.text` setter trap — a card-to-card asymmetry). Five changes:
+  ① `references/formats/pptx.md` gains a "clone the master layouts (no hand-drawn TextBox on a blank slide)" section
+  + 3 python-pptx API traps `[VERIFIED ✓ — 2026-06-16, measured on 1.0.2]` (`text_frame.text=` destroys inherited rPr →
+  theme Calibri collapse / an unset `font.size` → master 28pt fallback / a `width=0` box → text vanishes) + level-index
+  0-base correction. ② `agents/doc-builder.md` Investigation_Protocol gains a **mandatory mechanical assertion step**
+  (before rendering, re-open with python-pptx and check font.size present, width/height>0, font matches, no leftover
+  placeholder; no handoff before `ASSERT OK` — catches the v4/v5 class a PNG eyeball misses). ③ `agents/doc-verifier.md`
+  **re-runs the same assertion independently**, distrusting the builder's `ASSERT OK` (self-approval ban — "opens" ≠ "format
+  preserved"). ④ `skills/docs-standardize`·`docs-pilot` make **standardize non-skippable when a template is supplied**
+  (extract the layout/placeholder map first). ⑤ **hook contract change** — `hooks/docs_verify_emit.py`'s `is_doc_build`
+  now catches the builder's recommended path `python3 build_deck.py` (the detection blind spot of the old "signal AND
+  extension" condition); an inline engine signal fires on its own, an unrelated `analyze_runs.py` stays silent (noise
+  control preserved); the reminder body now points at the shape-assertion gate. Regression guard `tests/test_verify_emit.py` (9 cases).
 - **Two-tier wiki — extended the `wiki_query` contract to local + global ascent merging** (ADAPT backport
   of oms `e47ab44`'s two-tier ascent wiki into the omd domain). The `wiki_query(category)` implementation merges the local
   `.omd/wiki/` + the nearest parent `.omd/wiki/` (global level, discovered via ascent — same as git's `.git`-finding

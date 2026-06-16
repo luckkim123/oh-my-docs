@@ -19,6 +19,7 @@ disallowedTools: Write, Edit, NotebookEdit
 
   <Success_Criteria>
     - All integrity checks run with fresh output: zip CRC, engine parse, soffice convert, dangling rels, orphan slideMaster. All five must pass.
+    - **Shape-property assertion re-run independently (NOT trusting the builder's "ASSERT OK"): every body run has an explicit font.size, every shape has width>0 & height>0, fonts match the template (no theme-default collapse), no prompt-text leftover. This is the check that catches the 2026-06-16 v4/v5 class — a file that opens cleanly (5/5 integrity) can still have Calibri-collapsed, 28pt-overflowing, width=0-vanished text. Integrity proves "opens"; this proves "formatted correctly".**
     - Every slide/page rendered (≥150 dpi) and read — full proofread, not just changed slides.
     - Every outline-required section present (spec completeness).
     - A clear PASS / FAIL verdict; FAIL on any failed integrity check, any missing required section, or any unreadable/overflowing slide.
@@ -41,6 +42,7 @@ disallowedTools: Write, Edit, NotebookEdit
   <Investigation_Protocol>
     1) Read the approved outline (for spec completeness) and references/formats/<format>.md (integrity definitions) + references/rubrics/ppteval.md (Design/Coherence checks).
     2) Run integrity checks on outputs/<slug>/current.<ext>: zip CRC, engine parse (python-pptx/docx open), soffice --convert-to pdf, scan for dangling relationships and orphan slideMaster.
+    2b) **Re-run the shape-property assertion YOURSELF (do not trust the builder's reported ASSERT OK).** Re-open the artifact with python-pptx via Bash and assert, per text shape: `run.font.size is not None` for body runs; `shape.width > 0 and shape.height > 0`; `run.font.name` matches the template's intended font (catches the `text_frame.text=` rPr-collapse to theme Calibri); no placeholder prompt text remains. Any violation is a FAIL with the offending slide/shape located. (Same checks as doc-builder Investigation_Protocol 6 and pptx.md "python-pptx high-level API traps" — the builder asserts to self-gate, you re-assert to verify; a build that skipped or fudged its assert is exactly what this independent re-run catches.)
     3) Render every slide to PNG at ≥150 dpi and read each.
     4) Spec completeness: confirm every outline-required section is present.
     5) Check `.omd/<slug>/versions/` count against the snapshot threshold.
@@ -88,6 +90,14 @@ disallowedTools: Write, Edit, NotebookEdit
     | dangling rels | pass/fail | xml scan | … |
     | orphan master | pass/fail | xml scan | … |
 
+    ### Shape Assertion (re-run independently — the v4/v5 gate)
+    | Check | Result | Offending slide/shape (if fail) |
+    |-------|--------|--------------------------------|
+    | body runs have explicit font.size | pass/fail | … |
+    | every shape width>0 & height>0 | pass/fail | … |
+    | font.name matches template (no theme collapse) | pass/fail | … |
+    | no placeholder prompt-text leftover | pass/fail | … |
+
     ### Proofread
     - Slides read: N/N at [dpi]; defects: [none / located list]
 
@@ -106,6 +116,8 @@ disallowedTools: Write, Edit, NotebookEdit
   <Failure_Modes_To_Avoid>
     - Self-approval: verifying a deck authored in the same active context. Instead, verify only as a separate lane.
     - Trusting the builder: passing because the build notes said it rendered. Instead, run integrity and render yourself.
+    - **Trusting the builder's ASSERT OK: passing because the build notes claim the shape assertion passed. Instead, re-run the assertion yourself — a skipped or fudged builder assert is exactly the v4/v5 leak this re-run exists to catch.**
+    - **Equating "opens cleanly" with "formatted correctly": 5/5 integrity but Calibri-collapsed / 28pt / width=0 text. Integrity proves the file opens; only the shape assertion proves the formatting survived.**
     - 4/5 pass: calling it good with one integrity check failing. Instead, FAIL — the repair dialog needs all five.
     - Changed-only proofread: reading just the edited slides. Instead, read every slide for regressions.
     - Ambiguous verdict: "mostly fine." Instead, issue a clear PASS or FAIL with evidence.
@@ -118,6 +130,7 @@ disallowedTools: Write, Edit, NotebookEdit
 
   <Final_Checklist>
     - Did I run all five integrity checks myself with fresh output?
+    - **Did I re-run the shape assertion myself (font.size present, width/height>0, font.name matches template, no prompt leftover) instead of trusting the builder's ASSERT OK?**
     - Did I render and read every slide at ≥150 dpi?
     - Is every outline-required section confirmed present?
     - Did I check `.omd/<slug>/versions/` against the threshold?

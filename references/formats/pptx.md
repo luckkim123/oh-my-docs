@@ -27,6 +27,62 @@ soffice --headless --convert-to pdf --outdir <dir> <deck.pptx>
 pdftoppm -png -r 150 <deck.pdf> <dir>/slide   # ≥150 dpi — low dpi hides overlap
 ```
 
+## Building on a master template — clone layouts, do NOT hand-draw
+
+> When the user supplies a designed master template (`.pptx` with real layouts), the deck must be
+> built by **instantiating those layouts**, never by adding blank slides and drawing TextBoxes by
+> hand. Hand-drawn boxes lose the template's Contents page, flag icons, centered-title placement,
+> and number formatting — the exact `2026-06-16` herolab regression (v1–v3). `docs-standardize`
+> must run first to extract the layout/placeholder map; this card assumes that map exists.
+
+- **Add slides from a layout, fill placeholders — never `add_textbox` on a blank slide.**
+  `slide = prs.slides.add_slide(prs.slide_layouts[idx])` then write into the inherited placeholders
+  (`slide.placeholders[ph_idx]`). The layout carries font, color, bullet/number style, and position;
+  a hand-drawn `add_textbox` inherits none of it and silently diverges from the template.
+- **Find the right layout/placeholder indices first, don't guess.** Indices are template-specific.
+  Dump them once: `for i,l in enumerate(prs.slide_layouts): print(i, l.name)` and
+  `for p in slide.placeholders: print(p.placeholder_format.idx, p.placeholder_format.type, p.name)`.
+  (herolab map, for reference: layouts `[1]=Title [2]=Contents [3]=Content`; Content body placeholder
+  `idx 1`, slide-number `idx 12`. Re-dump for any other template — do not hardcode these.)
+- **Empty placeholders left unfilled still render** as the template's prompt text ("Click to add…").
+  Either fill every placeholder you instantiated or remove the shape; verify catches leftover prompts.
+
+## python-pptx high-level API traps (the v4/v5 class — code correctness, not XML)
+
+> The XML/zip traps below are about repackaging. **These are about the everyday python-pptx calls
+> the builder makes on every run** — the layer that broke v4/v5 on `2026-06-16`. Sibling `docx.md`
+> documents the equivalent `paragraph.text` setter trap; pptx had the same hazard undocumented.
+
+- **`text_frame.text = "..."` (and `paragraph.text = ...`) DESTROYS inherited run formatting**
+  `[VERIFIED ✓ — 2026-06-16, python-pptx 1.0.2]`. Probed: after `body.text_frame.text = "..."`,
+  the new run's `font.size`, `font.name`, and `font.color.type` are **all `None`** — the setter
+  replaces the paragraph's runs with one bare run carrying **no `rPr`**, so the placeholder's
+  inherited font (e.g. Arial), color, and number/bullet style collapse to the theme default
+  (Calibri) and the numbering vanishes. To set text while keeping inherited style, write the **run**
+  level: keep/clear runs deliberately and set `run.text`, or set the text then re-assert
+  `run.font.name/size/color` explicitly. Never use the frame/paragraph-level `.text` setter on an
+  inherited placeholder.
+- **A run with no explicit `size` falls back to the master `bodyStyle` (often 28pt)**
+  `[VERIFIED ✓ — 2026-06-16: a fresh run's font.size is None]`. If you build runs yourself, set
+  `run.font.size` explicitly (`Pt(16)` etc.) — an unset size does NOT inherit the layout's intended
+  size, it falls through to the slideMaster's `bodyStyle`, overflowing tight boxes.
+- **A shape's box dims are independently mutable, and a 0-width box hides its text**
+  `[VERIFIED ✓ — 2026-06-16: `shape.width = 0` is accepted and leaves width at 0]`. If you set only
+  `top` (or any subset) on a shape whose other dims were never assigned, the unset ones stay 0 → a
+  `width=0` box whose text is **invisible** on the render while still present on disk (the
+  silent-failure cousin of the namespace ghost). When you position/resize a shape, assign all four
+  of `left/top/width/height` together.
+- **A fixed-height box without autofit overflows; a long title without wrap-control invades the
+  header** `[from 2026-06-16 — v5]`. For body text that may run 6–7 lines, either enable autofit
+  (`text_frame.word_wrap = True` + `auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE`) or give the box
+  enough height. For titles, keep them one line (the template's title box assumes single-line height).
+- **Paragraph level indexing: python-pptx `paragraph.level` is 0-based, but the master's `lstStyle`
+  defines them as `a:lvl1pPr` (=level 0), `a:lvl2pPr` (=level 1), …** `[VERIFIED ✓ — 2026-06-16,
+  python-pptx 1.0.2: fresh paragraph.level == 0]`. So `paragraph.level = 1` applies the SECOND
+  list-style level (`a:lvl2pPr`), not the first. When matching a template's bullet/number style by
+  level, remember the API integer is one less than the human "level N" — off-by-one here silently
+  applies the wrong bullet/indent.
+
 ## Hard traps (carried from defense ppt-edit experience)
 
 - **Never edit in place.** Original is sacred. Write to `outputs/<slug>/current.pptx`; the source

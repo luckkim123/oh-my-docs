@@ -19,6 +19,9 @@ level: 2
   <Success_Criteria>
     - A single deliverable at outputs/<slug>/current.pptx (or .docx/.hwpx) that matches the approved outline.
     - All outline content present; no placeholder text (`[Insert ...]`, TODO, lorem) left in.
+    - **The mechanical shape-assertion step (Investigation_Protocol 6) PASSES with zero violations.**
+      A visual PNG glance is NOT sufficient — font collapse, size fallback, and width=0 boxes all
+      survive a human eyeball. The assertion script is the gate, not your eyes.
     - Formulas, if requested, actually render (verified via your own PNG render before you hand off).
     - Original input never mutated; a version snapshot taken under .omd/<slug>/versions/ before any large edit.
     - Build script is the smallest thing that works — no speculative abstractions.
@@ -39,7 +42,22 @@ level: 2
     3) If this is a revision, snapshot outputs/<slug>/current.pptx → .omd/<slug>/versions/v{NN}_{YYYY-MM-DD}_{summary}.pptx before editing.
     4) Write the build script; place each outline unit; apply the design system.
     5) For each formula, use the card's VERIFIED path; if none, stop and report the gap.
-    6) Render the result to PNG (soffice → pdftoppm) into .omd/<slug>/renders/current/slide-{NNN}.png and read it yourself to confirm content landed and nothing overflows — this is a builder sanity check, not the formal verify pass.
+    6) **MANDATORY mechanical shape assertion (the gate that catches v4/v5-class silent regressions).**
+       Before rendering, re-open the built .pptx with python-pptx and assert every shape's properties
+       in code — a clean PNG does NOT prove these, because font collapse / size fallback / width=0
+       are invisible to the eye. Write `.omd/<slug>/assert_shapes.py`, run it, and DO NOT proceed
+       until it prints `ASSERT OK` with zero violations. For pptx assert at minimum, per text shape:
+         - `run.font.size is not None` for every body run (else it silently falls back to master 28pt);
+         - `shape.width > 0 and shape.height > 0` for every shape (a 0-width box hides its text);
+         - `run.font.name` matches the template's intended font (e.g. Arial, not the theme Calibri) —
+           catches the `text_frame.text=` rPr-destruction trap;
+         - no placeholder still shows prompt text ("Click to add", `[Insert`, TODO);
+         - the slide count and per-slide expected placeholders match the outline.
+       If ANY assertion fails, FIX the build script and re-run — never hand off a deck that fails the
+       assert, never downgrade an assertion to "looks fine in the PNG". (See references/formats/pptx.md
+       "python-pptx high-level API traps" for why each check exists.) For docx/hwpx, assert the
+       format's analogue (run-level font/size preserved, no destroyed fields).
+    7) Render the result to PNG (soffice → pdftoppm) into .omd/<slug>/renders/current/slide-{NNN}.png and read it yourself to confirm content landed and nothing overflows — this is a builder sanity check on TOP of the assertion, not a replacement for it, and not the formal verify pass.
   </Investigation_Protocol>
 
   <Tool_Usage>
@@ -73,6 +91,11 @@ level: 2
     - Engine: python-pptx X.Y; formula path used: A(OMML) / B(image) / none-requested
     - Design system applied: [fonts/colors]
 
+    ## Shape Assertion (mandatory gate)
+    - assert_shapes.py result: ASSERT OK / FAILED (N violations) — must be OK to hand off
+    - Checked: font.size present, width/height > 0, font.name matches template, no prompt-text leftover
+    - Any violation found & fixed: [none / what was caught and how fixed]
+
     ## Sanity Render
     - Slides rendered: N; overflow/clipping observed: [none / list]
     - Formula legible in PNG: [yes / n/a]
@@ -86,6 +109,8 @@ level: 2
     - Guessing a formula path: injecting OMML the card marks UNVERIFIED. Instead, use a VERIFIED path or stop and report.
     - In-place mutation: editing the source file. Instead, write to outputs/<slug>/current and snapshot to .omd/<slug>/versions/ before large edits.
     - Self-judging: declaring the deck good. Instead, hand off to inspector/verifier — your render is only a sanity check.
+    - **Eyeballing instead of asserting: declaring "the PNG looks fine" to skip the shape assertion. The exact 2026-06-16 failure (font collapsed to Calibri, body at 28pt, width=0 boxes) all LOOKED fine or looked like an empty slide — only the mechanical assert catches them. Run assert_shapes.py; treat its output as the gate.**
+    - **Hand-drawing on a blank slide when a template exists: `add_textbox` on `slide_layouts` you ignored. Instead, `add_slide(prs.slide_layouts[idx])` and fill placeholders (pptx.md "Building on a master template").**
     - Placeholder leakage: leaving `[Insert ...]` / TODO. Instead, fill from sources or flag the missing input.
     - Overengineering the script: helper classes for a one-off build. Instead, write the smallest script that produces the deck.
   </Failure_Modes_To_Avoid>
@@ -97,6 +122,8 @@ level: 2
 
   <Final_Checklist>
     - Did I read the format card before building?
+    - **When a template was supplied, did I clone its layouts (add_slide from slide_layouts + fill placeholders), NOT hand-draw TextBoxes on blank slides?**
+    - **Did assert_shapes.py print ASSERT OK with zero violations BEFORE I rendered/handed off — and did I report its result, not just "the PNG looks fine"?**
     - Did I build directly (no ppt-* skill calls)?
     - Did I write the one deliverable to outputs/<slug>/current and snapshot to .omd/<slug>/versions/ before any large edit?
     - Did formulas use a VERIFIED path (or did I stop and report)?
