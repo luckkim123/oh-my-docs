@@ -199,6 +199,83 @@ verification.** Prefer Path B.
 and the equation is legible in the PNG (Read-confirmed). No guessing into this card. (Path A failed
 exactly this test; Path B passed it.)
 
+## Editing utility techniques (inventory / replace / rearrange)
+
+Pattern observed in anthropics/skills pptx (source-available, not open source), reimplemented
+independently with python-pptx, 2026-07-09. **No code was copied or derived from the original
+scripts** — anthropics/skills' `document-skills/pptx/` carries a proprietary LICENSE.txt
+("Extract/Reproduce/Create derivative works... prohibited"), not Apache-2.0 (only *some* skills in
+that repo are Apache-2.0; the document-editing skills — docx/pdf/pptx/xlsx — are explicitly
+source-available only, per the repo's own README). Only the *concept* of each technique is
+described below, in this card's own words, backed by an independent implementation built and run
+on this machine (see Verification). Confidence: medium-low — these are useful shapes for
+`doc-builder`/`doc-inspector` to reach for, but treat as a starting point, not a hardened tool.
+Each technique below tested green on a synthetic 3-slide deck (mechanism proven), but none has run
+against a real production template yet — **promote each `[unverified — backport]` tag to
+`VERIFIED ✓` only after it's exercised on an actual deck build/edit**, same discipline as the
+Formulas section's Path A/B verification rule above.
+
+### 1. Shape inventory (JSON dump of position/font/text) — `[unverified — backport, mechanism-tested on synthetic deck]`
+Before editing an unfamiliar or template-sourced deck, walk `prs.slides` → `slide.shapes` once and
+dump a JSON snapshot: per shape, `shape_id`, `name`, EMU→inch position (`left`/`top`/`width`/`height`
+via `shape.left / 914400.0` etc.), and — if `shape.has_text_frame` — each paragraph's text and the
+first run's `font.name` / `font.size.pt` / `font.bold`. This gives `doc-builder` a single read-only
+pass to answer "what shapes exist, where, and what's in them" before making any edit, instead of
+re-deriving it ad hoc per task. Reimplemented and run on this machine (`inventory_reimpl.py`,
+disposable, not checked in): built a 3-slide test deck, walked shapes, dumped valid JSON with
+correct EMU→inch conversion for all shapes on all 3 slides. **Not yet exercised against a grouped
+shape (`GroupShape` recursion) or a real, complex production template** — promote to `VERIFIED ✓`
+only after that real-world run.
+
+### 2. Existence-validated replace (fail loud, not silent skip) — `[unverified — backport, mechanism-tested on synthetic deck]`
+When replacing text by shape name/id, look the shape up first and **raise if it isn't found**,
+rather than silently no-op-ing or matching the wrong shape. Concretely: iterate
+`slide.shapes`, compare `shape.name` (or an id you tracked from the inventory step), and if no match
+raise an error that lists the available shape names on that slide — so the caller immediately sees
+what typo or stale reference caused the miss, rather than shipping a deck where a top-level bullet
+silently never got replaced. This is the same discipline as the card's existing "provenance lock"
+rule, made mechanical: a target that doesn't exist is a hard error, not a quiet gap in the output.
+Reimplemented and run on this machine (`replace_reimpl.py`): valid-target replace succeeded and
+round-tripped correctly (`Presentation(output).slides[0].shapes.title.text` matched the new text
+after reopening); a deliberately-wrong shape name raised the expected exception listing the real
+shape names instead of failing silently. zip integrity (CRC + no duplicate parts) and a soffice
+PDF conversion of the output both passed. **Only tested against single-run, non-bulleted text
+replacement on this machine** — bullet-formatting reconstruction, multi-paragraph replacement, and
+theme-color runs are untested; promote per-feature as each is exercised on a real deck.
+
+### 3. Slide rearrange via `slides._sldIdLst` — `[unverified — backport, mechanism-tested on synthetic deck]`
+python-pptx's `Presentation.slides` object exposes `_sldIdLst` — the underlying OOXML list of
+slide-id entries (each an `<p:sldId>` referencing a slide part by relationship id). Reordering a
+deck to an arbitrary target sequence is XML-list surgery, not a slide-by-slide move API: read the
+existing entries out of `_sldIdLst`, clear it, then re-append the entries in the desired order
+(duplicating an entry before removal if the same slide must appear twice in the output — python-pptx
+has no built-in "duplicate slide" call, so a repeat requires deep-copying the slide part's XML and
+registering fresh image/media relationships, which is more involved than the pure-reorder case
+verified here). Reimplemented and run on this machine (`rearrange_reimpl.py`): took a 3-slide deck
+and reordered it to `[2, 0, 1]`; reopening the output confirmed slide titles appeared in the new
+order, zip integrity passed (CRC clean, no duplicate parts), and `soffice --headless --convert-to pdf`
+converted the result without error. **Only the pure-reorder (no duplication, no deletion) path was
+exercised** — promote the duplicate-slide and delete-slide variants separately once tried against a
+real template.
+
+### Optional: thumbnail grid for batch slide review — noted, not reimplemented
+anthropics/skills' `thumbnail.py` composites all slides (via the same soffice→pdftoppm render
+recipe already in this card's Engine section) into an N-column JPEG grid with slide-number labels —
+useful for `doc-inspector` to eyeball an entire deck's layout at a glance instead of opening every
+PNG individually. Worth reaching for if a large-deck review becomes a bottleneck, but not
+reimplemented or verified here — the existing per-slide PNG render/Read loop in this card's Hard
+traps section ("Proofread ALL slides") already covers the correctness-critical path.
+
+### What was deliberately NOT ported
+- **html2pptx engine (Playwright/PptxGenJS + its Node toolchain)**: not adopted. This card's
+  pipeline drives python-pptx directly; adding a second, Node-based generation engine would mean
+  maintaining two authoring paths (and two sets of traps) for the same output format. If a
+  browser-rendered-HTML-to-slide workflow is ever needed, it should be evaluated as a distinct,
+  explicitly-chosen engine — not silently absorbed into this card.
+- **OOXML/ooxml.md deep-dive content**: not reviewed for this pass: out of scope for "editing
+  utility techniques"; this card's existing Hard traps section already covers the OOXML-level traps
+  (`AlternateContent`, orphan slideMaster, namespace ghosts) that matter for python-pptx work.
+
 ## Version-snapshot policy (binary files can't git-diff)
 
 Layout is the fixed, deterministic structure in `references/output-layout.md` — the single

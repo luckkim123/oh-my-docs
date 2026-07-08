@@ -124,16 +124,142 @@ fig.savefig("eq.png", dpi=300, transparent=True, bbox_inches="tight"); plt.close
 **Rule**: a path is `VERIFIED ✓` only after a real .docx is generated, rendered via soffice→pdftoppm,
 and the equation is Read-confirmed legible. Path A passed this (with the two caveats); path B passed clean.
 
-## Editing existing docx — borrowed discipline (anthropics/skills, pattern only)
+## Editing existing docx — patterns observed in anthropics/skills (technique only, no code copied)
 
 OMD builds with python-docx directly. But for **heavy edits to an existing user docx**, the official
-skills' XML-edit discipline is worth borrowing (not the Node `docx-js` generator):
+skills' XML-edit discipline is worth borrowing (not the Node `docx-js` generator, and not their
+Python `Document`/`DocxXMLEditor` DOM-editor class or `ooxml/scripts/unpack.py`+`pack.py` — see
+license note below, and python-docx already covers the same ground, see the three subsections below):
 - Tracked changes author = `Claude` (default unless told otherwise). Deleting a whole paragraph must
   also mark the paragraph mark deleted (`<w:del/>` inside `<w:pPr><w:rPr>`) — else an empty paragraph lingers.
 - python-docx round-trips untouched unsupported elements (footnotes, etc.) automatically — **as long as
   you don't call the destructive `paragraph.text` setter / `clear()`** (see Hard traps).
-- The official `comment.py` is an allowed exception to "edit existing via XML" — boilerplate Python is
-  fine for adding comments (pre-escape text: `&amp;`, `&#x2019;` for smart quotes).
+- **Adding comments: use python-docx's native `Document.add_comment()`, not raw XML** — no engine
+  switch needed at all (see "Comment insertion" below).
+
+> **License note (why no code is copied here)**: anthropics/skills is a **mixed-license repo** — most
+> skills are Apache-2.0, but the document skills (`docx`/`pptx`/`xlsx`/`pdf`) are the exception: each
+> ships its own `LICENSE.txt` — "© 2025 Anthropic, PBC. All rights reserved... may not... Create
+> derivative works... Distribute... to any third party." **Source-available, not open source.** (The
+> Apache-2.0 badge on the `awesome-claude-skills` *aggregator* repo's README covers that repo's own
+> curation content, not the vendored official Anthropic skill folders it mirrors — this docx folder is
+> exactly that proprietary exception, same as `xlsx.md`'s corrected sourcing.) So the three sections
+> below describe *workflow/technique only*, reimplemented independently against python-docx + pandoc +
+> lxml — no source lines, scripts (`document.py`, `unpack.py`/`pack.py`), or schema files are copied
+> from that skill folder into this repo. Pattern observed in anthropics/skills docx (source-available,
+> not open source), reimplemented independently, 2026-07-09.
+
+### Redlining workflow (tracked changes on someone else's docx) `[VERIFIED ✓ — 2026-07-09, this machine]`
+
+Scenario this unlocks: **지도교수/공저자 tracked-changes 논문초안 리뷰** — you receive a collaborator's
+draft and must return minimal, reviewable tracked changes rather than a silently-rewritten file.
+
+**Engine stays python-docx.** No `docx-js`, no unpack/pack round-trip, no DOM-editor class needed —
+python-docx's `oxml` layer (`docx.oxml.OxmlElement`, already how `add_comment` and low-level edits work)
+can construct `<w:ins>`/`<w:del>` siblings directly, and `pandoc` (already in this vault's toolchain,
+`/opt/homebrew/bin/pandoc` 3.9.0.2 verified) reads them back for verification.
+
+1. **Read the draft with tracked changes preserved** (do NOT silently accept/reject — read what's there):
+   ```bash
+   pandoc --track-changes=all draft.docx -o draft_with_changes.md
+   ```
+   Verified output format: `[deleted text]{.deletion author="..." date="..."}[inserted text]{.insertion
+   author="..." date="..."}`. `--track-changes=accept`/`reject` silently resolve instead — use `all` for review.
+2. **Author the tracked change with python-docx oxml, not `paragraph.text =` (Hard traps rule).**
+   Minimal-diff principle (same discipline the official skill states): only wrap the words that actually
+   changed in `<w:del>`/`<w:ins>`; leave surrounding text in ordinary untouched runs.
+   ```python
+   from docx.oxml.ns import qn
+   from docx.oxml import OxmlElement
+
+   def make_tracked_replacement(paragraph, old_run_after, del_text, ins_text, author="Claude", rev_id="1"):
+       date = "2026-07-09T00:00:00Z"  # use datetime.now(timezone.utc) in real use
+       del_el = OxmlElement('w:del')
+       del_el.set(qn('w:id'), rev_id); del_el.set(qn('w:author'), author); del_el.set(qn('w:date'), date)
+       del_run = OxmlElement('w:r'); del_t = OxmlElement('w:delText'); del_t.text = del_text
+       del_run.append(del_t); del_el.append(del_run)
+       old_run_after._r.addnext(del_el)
+
+       ins_el = OxmlElement('w:ins')
+       ins_el.set(qn('w:id'), str(int(rev_id)+1)); ins_el.set(qn('w:author'), author); ins_el.set(qn('w:date'), date)
+       ins_run = OxmlElement('w:r'); ins_t = OxmlElement('w:t'); ins_t.text = ins_text
+       ins_run.append(ins_t); ins_el.append(ins_run)
+       del_el.addnext(ins_el)
+   ```
+   **Reproduced this session**: `"The term is 30 days."` → run split into `"The term is "` (untouched) +
+   `<w:del>30</w:del>` + `<w:ins>60</w:ins>` + `" days."` (untouched).
+3. **Verify by render, not just XML validity** — same discipline as the PAGE-field rule above.
+   `soffice --convert-to pdf` → `pdftoppm` → Read the JPEG. `[STATUS: VERIFIED ✓]` this session: the
+   rendered page showed strikethrough **30**, underlined **60**, and a change bar in the margin — the
+   real Word tracked-changes visual, not just correct-looking XML.
+4. **Verify the resulting text with pandoc**, both to confirm the edit landed and that reject/accept
+   resolve correctly:
+   ```bash
+   pandoc --track-changes=all reviewed.docx -o verify.md   # both spans visible, correct author/date
+   pandoc --track-changes=accept reviewed.docx -o final.md # "The term is 60 days." (new text wins)
+   grep "30 days" final.md   # should NOT match
+   ```
+5. **Batch related edits, don't do the whole document as one script.** Group 3-10 changes per batch
+   (by section/type/proximity — same guidance as the official skill), re-grep the current
+   `word/document.xml` (or re-locate the paragraph via python-docx) before each batch since prior edits
+   shift things.
+
+Everything above ran and produced the exact evidence stated — this section is `VERIFIED`, not
+`[unverified — backport]`, for the case exercised (authoring a fresh tracked change on a plain-text
+run). **`[unverified — backport]`**: rejecting/accepting an *existing other-author* tracked change
+(nested `<w:ins>`/`<w:del>` from a prior reviewer) — same oxml-sibling-insert technique should apply to
+the existing element rather than a plain run, but this was not exercised this session. Promote to
+`VERIFIED` after a real multi-author draft round-trip.
+
+### OOXML XSD schema validation `[VERIFIED ✓ — 2026-07-09, this machine]`
+
+Confirms a generated/edited docx's `word/document.xml` is structurally valid **before** shipping it —
+catches schema violations (bad element ordering in `<w:pPr>`, malformed tracked-change nesting) that
+soffice may silently tolerate or mis-render instead of rejecting.
+
+**Engine: `lxml.etree.XMLSchema`** (already in the engine table for math/OMML — no new dependency).
+The schema itself is the public **ECMA-376 / ISO/IEC 29500 WordprocessingML** standard (`wml.xsd`),
+obtainable directly from ecma-international.org/ISO — **not vendored into this repo** (avoids the
+anthropics/skills proprietary-license question entirely; we reference the public standard, not their
+copy of it).
+
+```python
+from lxml import etree
+schema = etree.XMLSchema(etree.parse("wml.xsd"))  # ECMA-376/ISO-29500 Part 4, obtained separately
+valid = schema.validate(etree.parse("unpacked/word/document.xml"))
+if not valid:
+    for e in schema.error_log:
+        print(e)  # line, column, message
+```
+**Reproduced this session**: `wml.xsd` compiled in <0.1s (no unresolved includes/imports), and a real
+`word/document.xml` (containing the tracked-change runs from the redlining test above) validated `True`
+with zero errors. Use as a pre-flight gate in `doc-builder`/`doc-verifier` alongside the existing
+render-based checks — schema validity is necessary but not sufficient (a schema-valid file can still
+mis-render; keep the soffice→pdftoppm→Read gate as the visual authority).
+
+### Comment insertion `[VERIFIED ✓ — 2026-07-09, this machine]`
+
+python-docx 1.2.0 has a **native comment API** — `Document.add_comment()` — so this needs **no XML
+injection at all**, unlike the anthropics/skills approach (their `comment.py` boilerplate against the
+DOM-editor class). This is a straight engine-native win.
+
+```python
+from docx import Document
+doc = Document("draft.docx")
+paragraph = doc.paragraphs[0]
+doc.add_comment(runs=paragraph.runs[0], text="Please verify this claim.", author="Claude", initials="C")
+doc.save("outputs/<slug>/current.docx")
+```
+- `runs` accepts a single `Run` or a sequence (e.g. `paragraph.runs` for a whole paragraph) — python-docx
+  anchors the comment range from the first run to the last, using `w:commentRangeStart`/`w:commentRangeEnd`.
+- Comment placement is on **even run boundaries only** — you cannot anchor mid-run; split the run first
+  (or run-level edit per Hard traps) if the comment must start/end inside a run.
+- **Reproduced this session**: `doc.add_comment(...)` → `doc.save()` → reopened with `Document(path)` →
+  `doc.comments[0].author/.text` read back correctly (`"Claude"` / `"Please verify this claim."`) → the
+  file also converted cleanly via `soffice --convert-to pdf` (no corruption). Pandoc also surfaces the
+  comment as a `{.comment-start/.comment-end}` span when converting to markdown, useful for text-only review.
+- Use for: reviewer-style annotations without altering document text (complements the redlining workflow
+  above — comments explain *why*, tracked changes show *what* changed).
 
 ## Version-snapshot policy
 Same layout as the pptx card: the one delivered `outputs/<slug>/current.docx`, with version snapshots
