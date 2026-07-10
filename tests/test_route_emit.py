@@ -121,3 +121,30 @@ def test_fail_open_on_bad_input():
         input="not json at all", capture_output=True, text=True,
     )
     assert proc.returncode == 0
+
+
+def test_context_states_ssot_first_gate():
+    """⑩ SSOT-first 필독 게이트: 첫 생성·방향 제시 전 .omd/wiki/ 를 소스/기억보다
+    먼저 SSOT 로 읽고, .omd/<slug>/ 존재를 확인해 기존 build 를 재사용하라는
+    contract 가 박혀야 한다 (oms 의 SSOT 게이트와 동형).
+
+    Origin: 2026-07-09 multibeam-sonar 세션. 이미 v01~v04 로 진화한 herolab
+    템플릿 build 시스템(.omd/<slug>/)과 스타일 규칙(.omd/wiki/)이 전부 있었는데
+    담당 세션이 그 어느 것도 읽지 않고 빈 Presentation() 백지에서 새로 만들어
+    전면 반려됨. 근본원인 = omd 라우팅에 oms 의 'SSOT 우선 필독' 게이트가 없던
+    구조적 갭. wiki note: pattern/read-existing-work-before-building.md."""
+    out = context_of(run_hook({"prompt": "이 발표자료 개선해줘"}))
+    assert ".omd/wiki/" in out            # wiki 를 SSOT 로 먼저
+    assert "먼저" in out                  # 소스/일반론/기억보다 '먼저'
+    assert "결함" in out                  # wiki 두고 즉흥 스타일 = 결함 명시
+    assert ".omd/<slug>/" in out          # 진행 중 산출물 존재 확인
+    assert "재사용" in out                # 기존 build 파이프라인 재사용
+    assert "Presentation()" in out        # 빈 백지 금지 (herolab 템플릿 산출물)
+
+
+def test_ssot_gate_forbids_direction_before_recon():
+    """⑩-b 지형 미파악 상태의 방향 제시 금지 — '이렇게 개선하겠다'를
+    wiki·slug 확인 전에 내놓지 말라는 규율이 박혀야 (백지 재시작 직결)."""
+    out = context_of(run_hook({"prompt": "이 슬라이드 이렇게 바꾸자"}))
+    assert "방향 제시" in out
+    assert "백지" in out  # 지형 미파악 방향 제시 → 백지 재시작
