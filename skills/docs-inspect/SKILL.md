@@ -11,7 +11,7 @@ description: |
 # docs-inspect — In-Progress Review (Formative)
 
 <Purpose>
-Critiques an in-progress document formatively. Presents *ranked* improvements along the PPTEval 3 axes — advice at the stage where change is still cheap. Separates and elevates what ppt-edit only verified into active critique.
+Critiques an in-progress document formatively. Presents *ranked* improvements along the format's rubric card axes (office: PPTEval 3 axes) — advice at the stage where change is still cheap. Separates and elevates what ppt-edit only verified into active critique.
 </Purpose>
 
 <Use_When>
@@ -45,7 +45,7 @@ The format's rubric card is the single source of truth — office: references/ru
 </Steps>
 
 <Multi_Lens_When>
-Multi-lens is for a large deck (20+ slides) or when a precise review is needed. For a small deck, a single inspector covers the 3 axes in one pass — 3 lenses is overkill. Either way, the inspector is in a different lane from the builder (no self-approval).
+Multi-lens is for a large deck (20+ slides) or when a precise review is needed. For a small deck, a single inspector covers the rubric card's axes in one pass (office: 3) — going per-axis is overkill. Either way, the inspector is in a different lane from the builder (no self-approval).
 </Multi_Lens_When>
 
 <Output>

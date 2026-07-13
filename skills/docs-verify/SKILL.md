@@ -1,8 +1,8 @@
 ---
 name: docs-verify
 description: |
-  Final verification of a completed document — file integrity (zip CRC / engine parsing / soffice conversion / dangling rels / orphan master 5/5)
-  + exhaustive PNG read-through + completeness against the outline → a clear PASS/FAIL gate. The context that produced the output cannot
+  Final verification of a completed document — the card-defined verify gate (office: file integrity zip CRC / engine parsing / soffice conversion / dangling rels / orphan master 5/5
+  + exhaustive PNG read-through; text genres: the card's exit-code chain) + completeness against the outline → a clear PASS/FAIL gate. The context that produced the output cannot
   self-approve (no self-approval). OMD's final stage.
   Triggers: 최종 검증, 이거 문제없어, 최종본 확인, 무결성, 검수, 납품 전 확인,
   verify document, final check, integrity, 복구 다이얼로그, 깨졌나
