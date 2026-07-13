@@ -97,6 +97,15 @@ def test_context_states_consensus_rationale():
     assert "Deliberate" in out
 
 
+def test_pdf_is_not_a_generation_format():
+    """H5 결정: pdf는 입력·변환 층위 — FORMAT/STAGE 슬롯에 절대 편입 금지."""
+    out = context_of(run_hook({"prompt": "이 PDF로 발표자료 만들어줘"}))
+    stage_lines = [l for l in out.splitlines() if l.startswith("STAGE(docs)")]
+    assert stage_lines, "STAGE token line must exist"
+    assert "pdf" not in stage_lines[0]          # STAGE 토큰 줄에 pdf 없음
+    assert "입력·변환 층위" in out                 # 층위 표기는 존재
+
+
 def test_stage_label_distinct_from_paper_and_lane():
     """⑦ omd 레이블(STAGE(docs))이 oms(STAGE(paper))·omha(ROUTE)와 달라
     한 화면에 같이 떠도 구분 가능. 이모지 미사용."""
