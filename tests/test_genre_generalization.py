@@ -59,6 +59,15 @@ def test_repo_docs_rubric_exists_and_splits_axes():
         assert lens in text, f"qualitative lens {lens!r} missing"
 
 
+def test_site_rubric_exists_and_splits_axes():
+    text = _ref("rubrics/site-rubric.md")
+    assert "verify gate" in text          # 기계 축(빌드/링크)은 카드 게이트 소관 명시
+    assert "Diátaxis" in text             # 정보 구조 축의 프레임 원출처
+    assert "no self-approval" in text     # ppteval·repo-docs 와 동일한 분리 규칙
+    for lens in ("Information architecture", "Prose quality"):
+        assert lens in text, f"qualitative lens {lens!r} missing"
+
+
 # ── T8: 앞단 스킬 (§4.4-8/F7 — 발표 어휘 하드코딩 해소) ────────────────
 
 def test_intake_genre_frames_from_card():
