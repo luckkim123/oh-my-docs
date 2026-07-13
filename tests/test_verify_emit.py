@@ -234,3 +234,109 @@ def test_cooldown_fail_open_on_corrupt_throttle_file(tmp_path):
     (omd / ".hook-throttle.json").write_text("{not valid json")
     out = run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
     assert out.strip() != ""
+
+
+# ── D5 (R2): md 계열 Edit|Write 트리거 ────────────────────────────────
+# md 산출물(repo-docs·site)은 Bash가 아니라 Edit|Write로 태어난다. 발화 조건 3중:
+# .md 확장자 AND outputs/<slug>/ 경로 AND .omd/<slug>/ 실재(slug 컨텍스트 — §7 ②).
+# 작업 메모(.omd/<slug>/*.md)는 deliverable이 아니므로 침묵(§7 ⑥ alert fatigue).
+
+def run_md_hook(file_path: str, tool_name: str = "Edit", cwd: Optional[str] = None) -> str:
+    payload = {"tool_name": tool_name, "tool_input": {"file_path": file_path}}
+    if cwd is not None:
+        payload["cwd"] = cwd
+    proc = subprocess.run(
+        [sys.executable, str(HOOK)],
+        input=json.dumps(payload),
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, f"hook exited {proc.returncode}: {proc.stderr}"
+    return proc.stdout
+
+
+def _with_slug(tmp_path, slug="2026-07-13-omd-readme"):
+    (tmp_path / ".omd" / slug).mkdir(parents=True)
+    return slug
+
+
+def test_md_edit_fires_and_arms_on_single_file(tmp_path):
+    """d1) 단일 파일 outputs/<slug>/current.md 편집 → 발화 + 센티널 arm."""
+    slug = _with_slug(tmp_path)
+    out = run_md_hook(f"outputs/{slug}/current.md", cwd=str(tmp_path))
+    assert out.strip() != ""
+    assert (tmp_path / ".omd" / slug / ".verify-pending").is_file()
+
+
+def test_md_write_fires_on_artifact_set_member(tmp_path):
+    """d2) artifact-set 멤버 Write → 발화."""
+    slug = _with_slug(tmp_path)
+    out = run_md_hook(f"outputs/{slug}/current/README.md", tool_name="Write", cwd=str(tmp_path))
+    assert out.strip() != ""
+
+
+def test_md_edit_fires_on_nested_site_tree(tmp_path):
+    """d3) site 중첩 트리 픽스처(비평 #5 — 실물은 R3, 경로 구조는 지금 검증)."""
+    slug = _with_slug(tmp_path)
+    out = run_md_hook(f"outputs/{slug}/current/docs/how-to/deploy.md", cwd=str(tmp_path))
+    assert out.strip() != ""
+    assert (tmp_path / ".omd" / slug / ".verify-pending").is_file()
+
+
+def test_md_edit_fires_on_absolute_path(tmp_path):
+    """d4) 절대경로 file_path도 동일 판정 (textual segment 추출)."""
+    slug = _with_slug(tmp_path)
+    abs_path = str(tmp_path / "outputs" / slug / "current" / "README.md")
+    assert run_md_hook(abs_path, cwd=str(tmp_path)).strip() != ""
+
+
+def test_md_edit_silent_without_slug_context(tmp_path):
+    """d5) .omd/<slug>/ 없으면 침묵 + 센티널 없음 (일반 md 편집 과발동 금지, §7 ②)."""
+    out = run_md_hook("outputs/somedoc/current/README.md", cwd=str(tmp_path))
+    assert out.strip() == ""
+    assert not (tmp_path / ".omd" / "somedoc" / ".verify-pending").exists()
+
+
+def test_md_edit_silent_on_work_area_and_plain_paths(tmp_path):
+    """d6) outputs/ 밖(.omd 작업 메모, 일반 docs/)은 slug 컨텍스트가 있어도 침묵."""
+    slug = _with_slug(tmp_path)
+    assert run_md_hook(f".omd/{slug}/build-notes.md", cwd=str(tmp_path)).strip() == ""
+    assert run_md_hook("docs/notes.md", cwd=str(tmp_path)).strip() == ""
+
+
+def test_non_md_write_silent(tmp_path):
+    """d7) md가 아닌 파일 Write는 침묵."""
+    slug = _with_slug(tmp_path)
+    assert run_md_hook(f"outputs/{slug}/current/logo.png", tool_name="Write",
+                       cwd=str(tmp_path)).strip() == ""
+
+
+def test_md_reminder_points_at_card_gate(tmp_path):
+    """d8) md 리마인더는 오피스 5/5가 아니라 카드 정의 verify gate를 가리켜야 (D1)."""
+    slug = _with_slug(tmp_path)
+    out = run_md_hook(f"outputs/{slug}/current/README.md", cwd=str(tmp_path))
+    ctx = json.loads(out)["hookSpecificOutput"]["additionalContext"]
+    assert "verify gate" in ctx
+    assert "repo-docs" in ctx
+    assert "zip CRC" not in ctx  # 오피스 전용 문구 미혼입
+
+
+def test_markdownlint_bash_clears_md_sentinel(tmp_path):
+    """d9) markdownlint 실행(verify 신호)이 md-arm 센티널을 clear하고 침묵."""
+    slug = _with_slug(tmp_path)
+    run_md_hook(f"outputs/{slug}/current/README.md", cwd=str(tmp_path))
+    sentinel = tmp_path / ".omd" / slug / ".verify-pending"
+    assert sentinel.is_file()
+    out = run_hook(f"npx markdownlint-cli2 outputs/{slug}/current/*.md", cwd=str(tmp_path))
+    assert out.strip() == ""
+    assert not sentinel.exists()
+
+
+def test_md_edit_fail_open_on_missing_file_path(tmp_path):
+    """d10) file_path 없는 payload도 rc 0·침묵 (fail-open)."""
+    proc = subprocess.run(
+        [sys.executable, str(HOOK)],
+        input=json.dumps({"tool_name": "Edit", "tool_input": {}, "cwd": str(tmp_path)}),
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 0
+    assert proc.stdout.strip() == ""

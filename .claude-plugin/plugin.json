@@ -42,6 +42,16 @@
             "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/docs_verify_emit.py"]
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/docs_verify_emit.py"]
+          }
+        ]
       }
     ],
     "PreToolUse": [
