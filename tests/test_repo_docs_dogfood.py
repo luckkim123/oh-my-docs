@@ -30,6 +30,8 @@ def test_readme_short_description_and_toc_rule():
     """gate ①: 제목 직후 짧은 설명(≤120자 한 줄) + 100줄 이상이면 ToC 필수."""
     lines = README.splitlines()
     assert lines[0].startswith("# "), "title must open the file"
+    desc = next(l for l in lines[1:] if l.strip())
+    assert len(desc) <= 120, f"short description is {len(desc)} chars (> 120, standard-readme)"
     if len(lines) >= 100:
         assert any("Table of Contents" in h or "목차" in h for h in _readme_h2s()), \
             "README ≥100 lines requires a ToC (standard-readme)"

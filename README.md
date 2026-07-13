@@ -1,6 +1,6 @@
 # oh-my-docs (OMD)
 
-Multi-agent orchestration harness specialized for document work (pptx/docx/xlsx/hwpx) — the OMC architecture (stage skills + role agents + routing hook + manifest) ported to the document domain.
+Multi-agent orchestration harness specialized for document work (pptx/docx/xlsx/hwpx).
 
 ## Table of Contents
 
@@ -69,6 +69,9 @@ deliverables with a manifest), and this README/CHANGELOG regenerated through tha
 (dogfooding). Roadmap: R3 MkDocs site genre → R4 knowledge lifecycle.
 
 ## Architecture
+
+The OMC architecture (stage skills + role agents + routing hook + manifest) is ported to
+the document domain.
 
 ```text
 skills/       docs-intake · docs-standardize · docs-plan · docs-build · docs-inspect ·
