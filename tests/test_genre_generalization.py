@@ -46,3 +46,14 @@ def test_revise_pass_definition_tracks_verifier():
     assert "PS-4" in body
     # recur-방지(포맷 불가지론) 항목은 유지
     assert "does not recur" in body
+
+
+# ── T7: repo-docs 루브릭 (PS-3 동적 렌즈) ─────────────────────────────
+
+def test_repo_docs_rubric_exists_and_splits_axes():
+    text = _ref("rubrics/repo-docs-rubric.md")
+    assert "verify gate" in text          # 기계 축은 카드 게이트 소관 명시
+    assert "Treude" in text               # 차원 프레임 원출처 (7축 아님 — CHI 검증 반영)
+    assert "no self-approval" in text     # ppteval과 동일한 분리 규칙
+    for lens in ("Welcoming", "Information scent", "Honesty"):
+        assert lens in text, f"qualitative lens {lens!r} missing"
