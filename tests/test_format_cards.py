@@ -90,3 +90,13 @@ def test_site_external_links_not_in_default_gate():
     # spec §7 ③ 동형: 외부 링크는 네트워크 의존 — 기본 게이트 제외, lychee 설치 시 선택
     text = (FORMATS_DIR / "site.md").read_text(encoding="utf-8")
     assert "lychee" in text and "optional" in text
+
+
+def test_site_card_mkdocs_engine_stamped():
+    """R3 실측 태스크의 완료 정의 — MkDocs 행이 이 머신에서 VERIFIED + 버전 핀."""
+    text = (FORMATS_DIR / "site.md").read_text(encoding="utf-8")
+    engine = _engine_section(text)
+    mkdocs_rows = [l for l in engine.splitlines() if l.startswith("| MkDocs")]
+    assert mkdocs_rows, "site.md: MkDocs engine row missing"
+    assert "VERIFIED ✓" in mkdocs_rows[0], "MkDocs row not yet stamped"
+    assert VERSION_RE.search(mkdocs_rows[0]), "MkDocs row pins no version"

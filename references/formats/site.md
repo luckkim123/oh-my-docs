@@ -12,8 +12,8 @@
 
 | Tool | Role | Version (measured) | Status |
 |:---|:---|:---|:---|
-| MkDocs (via `uvx --from mkdocs --with mkdocs-material mkdocs`) | build + `--strict` machine gate (gate ①) | — | UNVERIFIED (initial — the R3 measurement task stamps this machine) |
-| mkdocs-material | theme; its `palette:` schema is this genre's no-reference fallback (F8) | — | UNVERIFIED |
+| MkDocs (via `uvx --from mkdocs --with mkdocs-material mkdocs`) | build + `--strict` machine gate (gate ①) | 1.6.1 + material 9.7.6 | VERIFIED ✓ — 2026-07-13, mkdocs 1.6.1 + mkdocs-material 9.7.6 (uvx) |
+| mkdocs-material | theme; its `palette:` schema is this genre's no-reference fallback (F8) | 9.7.6 (mkdocs 1.6.1) | VERIFIED ✓ — 2026-07-13, mkdocs 1.6.1 + mkdocs-material 9.7.6 (uvx) |
 | markdownlint-cli2 (via `npx`) | gate ② lint | v0.23.0 (markdownlint v0.41.0) | VERIFIED ✓ — 2026-07-13, markdownlint-cli2 v0.23.0 (R2 stamp, same runner) |
 | lychee | external-link check (optional item) | — | UNVERIFIED — optional; network-dependent, excluded from the default gate |
 | python3 stdlib | nav-completeness / placeholder / link fixture checks | measured at dogfooding | see `tests/test_site_dogfood.py` |
@@ -75,9 +75,16 @@ nav:
 - **`--strict` alone does not catch nav-omitted pages** — `mkdocs build --strict` aborts
   on WARNING, but a `docs/**.md` file missing from `nav:` emits INFO by default, so a page
   can silently drop out of a green strict build. The `validation: nav: omitted_files: warn`
-  line promotes it to WARNING = strict failure. [source: MkDocs user guide (configuration
-  › validation) — accessed 2026-07-13 · candidate, the R3 measurement task promotes this
-  with observed log lines]
+  line promotes it to WARNING = strict failure. Measured (probe sandbox, orphan page not in
+  `nav:`): without the `validation:` block, `--strict` exits 1 but only on the unrelated
+  broken-link warning below — the log shows `INFO - The following pages exist in the docs
+  directory, but are not included in the "nav" configuration: - sub/orphan.md` (a page that
+  would silently ship if no other warning happened to fail the build). With the block added,
+  the same line promotes to `WARNING - The following pages exist in the docs directory, but
+  are not included in the "nav" configuration: - sub/orphan.md`, and strict output changes
+  from `Aborted with 1 warnings in strict mode!` to `Aborted with 3 warnings in strict mode!`
+  (the other +1 is the anchors promotion below). [VERIFIED ✓ — 2026-07-13, mkdocs 1.6.1 +
+  mkdocs-material 9.7.6]
 - **Default output lands inside the source set** — `mkdocs build` writes `site/` next to
   `mkdocs.yml`, i.e. *inside* `outputs/<slug>/current/`, breaking the D4 invariant (the
   current entry is the source set, exactly one entry). Always build with
@@ -87,13 +94,21 @@ nav:
 - **mkdocs-material config-key drift across majors** — Material renames/moves theme keys
   between major versions; a copied config from an old blog post fails on current Material.
   Pin behavior by measuring on this machine (Engine table), not by trusting snippets.
-  [source: Material for MkDocs changelog/upgrade guide — accessed 2026-07-13 · candidate,
-  promote with the measured Material version]
+  Measured: this card's own skeleton (`theme: {name: material, palette: [{scheme, primary,
+  accent}]}`) builds clean (`mkdocs build --strict` exit 0) against mkdocs-material 9.7.6 —
+  the keys above are confirmed current on this pin; re-measure on the next Engine-table
+  version bump (G7 engine-drift demotion rule). [VERIFIED ✓ — 2026-07-13, mkdocs 1.6.1 +
+  mkdocs-material 9.7.6]
 - **CJK search** — Material's built-in search tokenizes CJK poorly by default (`lang`/
   `separator` tuning or a plugin may be needed). Verify by inspecting the generated
-  `search_index.json` for CJK tokens before promising search over Korean pages.
-  [source: Material for MkDocs (search setup) — accessed 2026-07-13 · candidate, measure
-  when a Korean page enters a pilot]
+  `search_index.json` for CJK tokens before promising search over Korean pages. Measured:
+  a plain `theme: {name: material}` (no `lang`/`separator`/CJK plugin) built with a Korean
+  paragraph and the generated `search_index.json` config carries only `"lang":["en"]` and
+  `"separator":"[\s\-]+"` — the Korean text is indexed raw (whitespace/hyphen split only,
+  no CJK-aware segmentation), e.g. the whole sentence `한국어 검색 토큰 측정용 문단.` becomes
+  one `text` blob rather than per-word tokens. [source: Material for MkDocs (search setup)
+  — accessed 2026-07-13 · candidate — pilot is English-only (Task 8), full promotion
+  deferred until a Korean page enters a pilot]
 
 ## Verify gate (docs-verify / doc-verifier run this — deterministic, exit-code first)
 
@@ -101,9 +116,9 @@ nav:
 |:--|:---|:---|
 | ① | `mkdocs build --strict` exit 0 — **with the card's validation block present** | `uvx --from mkdocs --with mkdocs-material mkdocs build --strict -f <slug>/current/mkdocs.yml -d <workspace>/site-build`; missing engine → D3 degrade |
 | ② | markdownlint-cli2 passes over `docs/` | `npx markdownlint-cli2 "outputs/<slug>/current/docs/**/*.md"`; missing engine → D3 degrade. Config discovery follows markdownlint-cli2 (a project-root config may relax rules) — the report names which config applied |
-| ③ | Internal links & anchors resolve | covered by ①'s `validation.links` (not_found/anchors: warn + strict). External links: **optional** lychee item — network-dependent, excluded from the default gate |
+| ③ | Internal links & anchors resolve | **card correction (measured 2026-07-13)**: `links.not_found` is already `WARNING` by MkDocs' own default — `--strict` alone catches a broken internal link (`missing.md`) without the `validation:` block; only `links.anchors` needs the card's `validation.links.anchors: warn` to promote from its `INFO` default to a strict failure. External links: **optional** lychee item — network-dependent, excluded from the default gate |
 | ④ | Built-HTML fresh-read | Read representative built pages from `.omd/<slug>/site-build/` — the render read-through, text edition. "The build ran" is not "the site is right" |
-| ⑤ | nav completeness — every `docs/**.md` is in `nav:` | covered by ①'s `validation.nav.omitted_files: warn` + strict; the always-on stdlib double-check lives in the permanent guard (`tests/test_site_dogfood.py`), not in this gate |
+| ⑤ | nav completeness — every `docs/**.md` is in `nav:` | covered by ①'s `validation.nav.omitted_files: warn` + strict (measured 2026-07-13 — omitted_files promotion confirmed, see Hard traps; plan 결정 5's default branch holds, gate ⑤ stays covered by ①, not promoted to an independent check); the always-on stdlib double-check lives in the permanent guard (`tests/test_site_dogfood.py`), not in this gate |
 
 Log capture (AC-1b): every borrowed-engine run's stdout+stderr →
 `.omd/<slug>/verify-runs/<engine>-<timestamp>.log`, linked from the report.
