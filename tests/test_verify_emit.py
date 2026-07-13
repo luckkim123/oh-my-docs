@@ -13,6 +13,7 @@ stdlib only, fail-open.
 isomorphic 출처: tests/test_route_emit.py (같은 subprocess 패턴).
 """
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -23,9 +24,11 @@ import hooks.docs_verify_emit as mod
 HOOK = Path(__file__).parent.parent / "hooks" / "docs_verify_emit.py"
 
 
-def run_hook(command: str, tool_name: str = "Bash") -> str:
+def run_hook(command: str, tool_name: str = "Bash", cwd: str = None) -> str:
     """훅을 서브프로세스로 실행하고 stdout 반환 (fail-open: rc는 항상 0)."""
     payload = {"tool_name": tool_name, "tool_input": {"command": command}}
+    if cwd is not None:
+        payload["cwd"] = cwd
     proc = subprocess.run(
         [sys.executable, str(HOOK)],
         input=json.dumps(payload),
@@ -121,3 +124,68 @@ def test_xlsx_named_script_triggers():
 def test_dead_doc_exts_removed():
     # H4: 죽은 상수가 다시 생기지 않도록 — 모듈에 DOC_EXTS가 없어야 한다
     assert not hasattr(mod, "DOC_EXTS")
+
+
+# ── G1: verify-pending 센티널 arm/clear ───────────────────────────────
+
+def test_arm_writes_slug_sentinel(tmp_path):
+    """a) build 명령 + command에 outputs/mydeck/ 경로 포함 → .omd/mydeck/.verify-pending 생성."""
+    run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
+    sentinel = tmp_path / ".omd" / "mydeck" / ".verify-pending"
+    assert sentinel.is_file()
+
+
+def test_arm_writes_global_sentinel_when_slug_unknown(tmp_path):
+    """b) build 명령 + slug 단서 없음 → .omd/.verify-pending 생성."""
+    run_hook("python3 build_deck.py", cwd=str(tmp_path))
+    sentinel = tmp_path / ".omd" / ".verify-pending"
+    assert sentinel.is_file()
+    nested = tmp_path / ".omd" / "mydeck" / ".verify-pending"
+    assert not nested.exists()
+
+
+def test_clear_removes_all_sentinels_and_stays_silent(tmp_path):
+    """c) pdftoppm 명령 → 기존 센티널 전부 제거, 리마인더 미발화."""
+    run_hook("python3 build_deck.py", cwd=str(tmp_path))
+    run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
+    assert (tmp_path / ".omd" / ".verify-pending").is_file()
+    assert (tmp_path / ".omd" / "mydeck" / ".verify-pending").is_file()
+
+    out = run_hook("pdftoppm -png -r 150 deck.pdf out", cwd=str(tmp_path))
+    assert out.strip() == ""
+    assert not (tmp_path / ".omd" / ".verify-pending").exists()
+    assert not (tmp_path / ".omd" / "mydeck" / ".verify-pending").exists()
+
+
+def test_clear_via_unzip_test_signal(tmp_path):
+    run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
+    sentinel = tmp_path / ".omd" / "mydeck" / ".verify-pending"
+    assert sentinel.is_file()
+    out = run_hook("unzip -t outputs/mydeck/deck.pptx", cwd=str(tmp_path))
+    assert out.strip() == ""
+    assert not sentinel.exists()
+
+
+def test_sentinel_content_has_armed_at_and_command_head(tmp_path):
+    """d) 센티널 내용은 json이고 armed_at(epoch float)·command_head(str) 키 보유."""
+    run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
+    sentinel = tmp_path / ".omd" / "mydeck" / ".verify-pending"
+    data = json.loads(sentinel.read_text())
+    assert isinstance(data["armed_at"], float)
+    assert isinstance(data["command_head"], str)
+
+
+def test_arm_fail_open_when_omd_uncreatable(tmp_path):
+    """e) .omd 디렉토리 생성 불가(권한) 시에도 exit 0 (fail-open)."""
+    blocker = tmp_path / ".omd"
+    blocker.write_text("not a directory")
+    proc = subprocess.run(
+        [sys.executable, str(HOOK)],
+        input=json.dumps({
+            "tool_name": "Bash",
+            "tool_input": {"command": "python3 build_deck.py"},
+            "cwd": str(tmp_path),
+        }),
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 0, f"hook exited {proc.returncode}: {proc.stderr}"

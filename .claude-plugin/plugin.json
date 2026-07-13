@@ -55,6 +55,18 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/docs_stop_guard.py"]
+          }
+        ]
+      }
     ]
   }
 }

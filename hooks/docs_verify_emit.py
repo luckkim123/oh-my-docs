@@ -19,8 +19,11 @@ SILENT unless a build/convert signal AND a document extension both appear. A
 read-only render (pdftoppm) or integrity check (unzip -t) alone does not trigger
 it. Fail-open: any error returns 0 so the session is never blocked."""
 import json
+import os
 import re
 import sys
+import tempfile
+import time
 
 # Build/convert signals — generation, not read-only inspection. These name the
 # engine/convert explicitly, so they fire on their own (an extension confirms intent).
@@ -40,6 +43,49 @@ RUN_SCRIPT_RE = re.compile(
     r"\bpython3?\b[^\n|&;]*\b\w*(build|deck|slide|doc|pptx|docx|xlsx|hwpx|present)\w*\.py\b",
     re.IGNORECASE,
 )
+
+# G1: verify-pending sentinel handshake — armed on build, cleared on a
+# verify-signal command, enforced (advisory) by hooks/docs_stop_guard.py at Stop.
+VERIFY_SIGNALS = ("pdftoppm", "unzip -t")
+SLUG_RE = re.compile(r"(?:\.omd|outputs)/([^/\s'\"]+)/")
+SENTINEL = ".verify-pending"
+
+
+def _omd_root(payload):
+    return os.path.join(payload.get("cwd") or os.getcwd(), ".omd")
+
+
+def _sentinel_path(root, command):
+    m = SLUG_RE.search(command)
+    return os.path.join(root, m.group(1), SENTINEL) if m else os.path.join(root, SENTINEL)
+
+
+def arm_sentinel(root, command):
+    """Atomic write (ST-1): half-written sentinels must never exist."""
+    path = _sentinel_path(root, command)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    body = json.dumps({"armed_at": time.time(), "command_head": command[:80]})
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".tmp-verify-")
+    with os.fdopen(fd, "w") as f:
+        f.write(body)
+    os.replace(tmp, path)
+
+
+def clear_sentinels(root, command):
+    # ponytail: clearing heuristic is command-string sniffing; upgrade to explicit
+    # verify-stage signaling if false-clears surface
+    if not os.path.isdir(root):
+        return  # defensive: callable safely outside main()'s try envelope
+    m = SLUG_RE.search(command)
+    targets = ([os.path.join(root, m.group(1), SENTINEL)] if m
+               else [os.path.join(root, SENTINEL)]
+               + [os.path.join(root, d, SENTINEL) for d in os.listdir(root)
+                  if os.path.isdir(os.path.join(root, d))])
+    for t in targets:
+        try:
+            os.remove(t)
+        except OSError:
+            pass
 
 
 def is_doc_build(command: str) -> bool:
@@ -83,7 +129,17 @@ def main() -> int:
 
     # 문서 산출/변환 명령일 때만 리마인더. 그 외 Bash 는 침묵.
     if not is_doc_build(command):
+        try:
+            if any(sig in command for sig in VERIFY_SIGNALS):
+                clear_sentinels(_omd_root(payload), command)
+        except Exception:
+            pass
         return 0
+
+    try:
+        arm_sentinel(_omd_root(payload), command)
+    except Exception:
+        pass  # fail-open: sentinel is best-effort, reminder still fires
 
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PostToolUse",
