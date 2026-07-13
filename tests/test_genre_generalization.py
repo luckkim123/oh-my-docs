@@ -57,3 +57,21 @@ def test_repo_docs_rubric_exists_and_splits_axes():
     assert "no self-approval" in text     # ppteval과 동일한 분리 규칙
     for lens in ("Welcoming", "Information scent", "Honesty"):
         assert lens in text, f"qualitative lens {lens!r} missing"
+
+
+# ── T8: 앞단 스킬 (§4.4-8/F7 — 발표 어휘 하드코딩 해소) ────────────────
+
+def test_intake_genre_frames_from_card():
+    body = _skill("docs-intake")
+    assert "the card defines" in body        # F7: 카드가 장르별 intake 질문 정의
+    assert "artifact-set scope" in body      # 세트 장르 스코프 게이트 (비평 #4)
+    assert "weakest component" in body       # PL-1: 컴포넌트 최솟값 판정
+    assert "PR-1" in body                    # 재수렴 신호
+    assert "defense/conference/lecture" in body  # 오피스 사례 보존
+
+
+def test_plan_structure_frame_from_card():
+    body = _skill("docs-plan")
+    assert "structure frame" in body
+    assert "section preset" in body          # repo-docs 프레임
+    assert "narrative arc" in body           # 오피스 프레임 보존
