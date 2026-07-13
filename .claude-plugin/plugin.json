@@ -1,6 +1,6 @@
 {
   "name": "oh-my-docs",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Multi-agent orchestration harness specialized for document work (pptx/docx/xlsx/hwpx)",
   "author": { "name": "kimseungmin" },
   "license": "MIT",
