@@ -57,7 +57,7 @@ this is where rearranging is cheapest. After approval, build. (For `--consensus`
 </Steps>
 
 <Output>
-Narrative arc + per-slide/section {purpose, key message, required assets} outline. The blueprint docs-build will fill in.
+Structure frame (office: narrative arc; repo-docs: section preset; site: quadrant map) + per-unit {purpose, key message, required assets} outline. The blueprint docs-build will fill in.
 **For `--consensus`, additionally**: `plan.md` (decision process — RALPLAN-DR+ADR) + re-review round (N/5) + whether consensus was reached. plan.md and the outline are two separate files (decision process ≠ decision result).
 </Output>
 

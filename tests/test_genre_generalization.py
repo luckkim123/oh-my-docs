@@ -75,3 +75,23 @@ def test_plan_structure_frame_from_card():
     assert "structure frame" in body
     assert "section preset" in body          # repo-docs 프레임
     assert "narrative arc" in body           # 오피스 프레임 보존
+
+
+# ── T9: 앞단 에이전트 (§4.4-8/F7·AC-3) ────────────────────────────────
+
+def _agent(name: str) -> str:
+    return (ROOT / "agents" / f"{name}.md").read_text(encoding="utf-8")
+
+
+def test_planner_success_criteria_generalized():
+    body = _agent("doc-planner")
+    assert "structure frame" in body
+    assert "section preset" in body
+    assert "## Narrative Arc" in body        # AC-1a 헤딩 보존
+
+
+def test_analyzer_has_input_boundary_and_genre_frame():
+    body = _agent("doc-analyzer")
+    assert "Input boundary" in body          # AC-3 화이트리스트
+    assert "never read the whole codebase" in body
+    assert "genre frame" in body

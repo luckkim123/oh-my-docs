@@ -41,7 +41,7 @@ in the D4 manifest `role` fields.
 4. **Round 0 — Topology** (after passing Gate 0, isomorphic to scholar-deepen): lock the document's top-level components (commonly 3-6) — sections + message clusters (bundles of core messages to convey) + asset units (figure/table/evidence). Prevents digging one branch depth-first and hiding its siblings.
 5. **Qualitative clear/vague judgment per dimension** (4 dimensions, no numbers — qualitative). Judge each dimension **per component** from the Round 0 topology; the dimension's overall verdict is its **weakest component's** verdict — one sharp component never masks a sibling's vagueness (PL-1):
    - **Audience clarity**: Is the audience sharp? (who, what they already know, what they expect)
-   - **Message clarity**: Is the one-sentence core message of this presentation sharp? Or blurred by several mixed messages?
+   - **Message clarity**: Is the one-sentence core message of this document sharp? Or blurred by several mixed messages?
    - **Evidence-density clarity**: Is the material (figure/data) backing each message sharp? Any claims left floating?
    - **Constraint clarity**: Are the time, length, delivery-format, and standard-template constraints sharp?
    Each dimension is "clear / vague". If 1 or more are "vague", trigger the corresponding challenge round.
