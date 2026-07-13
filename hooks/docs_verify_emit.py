@@ -1,5 +1,5 @@
 """OMD PostToolUse hook: when a Bash command builds/converts a document artifact
-(.pptx/.docx/.hwpx via python-pptx / python-docx / soffice), inject a
+(.pptx/.docx/.xlsx/.hwpx via python-pptx / python-docx / openpyxl / soffice), inject a
 document-integrity reminder (stdlib only, fail-open).
 
 Why Bash (not Edit|Write): OMD does not edit .pptx/.docx in place — those are
@@ -22,12 +22,12 @@ import json
 import re
 import sys
 
-DOC_EXTS = (".pptx", ".docx", ".hwpx")
 # Build/convert signals — generation, not read-only inspection. These name the
 # engine/convert explicitly, so they fire on their own (an extension confirms intent).
 BUILD_SIGNALS = (
     "python-pptx", "python-docx", "from pptx", "import pptx",
     "from docx", "import docx", "Presentation(", "Document(",
+    "openpyxl", "xlsxwriter", "Workbook(",
     "soffice --convert", "libreoffice --convert", "--convert-to",
 )
 # Builder's recommended path is "Write a build script, then run `python3 build.py`"
@@ -37,7 +37,7 @@ BUILD_SIGNALS = (
 # run whose name hints at document building (build/deck/slide/doc/pptx/docx/hwpx),
 # so an unrelated `python3 analyze_runs.py` does NOT trigger (noise control).
 RUN_SCRIPT_RE = re.compile(
-    r"\bpython3?\b[^\n|&;]*\b\w*(build|deck|slide|doc|pptx|docx|hwpx|present)\w*\.py\b",
+    r"\bpython3?\b[^\n|&;]*\b\w*(build|deck|slide|doc|pptx|docx|xlsx|hwpx|present)\w*\.py\b",
     re.IGNORECASE,
 )
 
@@ -67,7 +67,7 @@ def build_reminder() -> str:
         "+ 전수 정독을 확인할 것. 형성적 개선점은 docs-inspect.\n"
         "- ⚠️ '열리는 것 같다'는 검증이 아니다 — fresh 렌더 증거 없이 done 선언 금지. "
         "원본 in-place 수정 금지(최종본은 outputs/<slug>/current 하나, 버전 스냅샷은 .omd/<slug>/versions/).\n"
-        "- pptx/docx/hwpx 포맷 원형 유지(임의 변환 금지). 수식은 카드가 VERIFIED 표시한 경로만."
+        "- pptx/docx/xlsx/hwpx 포맷 원형 유지(임의 변환 금지). 수식은 카드가 VERIFIED 표시한 경로만."
     )
 
 

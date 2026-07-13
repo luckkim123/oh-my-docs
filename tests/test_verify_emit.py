@@ -17,6 +17,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+from hooks.docs_verify_emit import is_doc_build
+import hooks.docs_verify_emit as mod
+
 HOOK = Path(__file__).parent.parent / "hooks" / "docs_verify_emit.py"
 
 
@@ -101,3 +104,20 @@ def test_fail_open_on_bad_payload():
         capture_output=True, text=True,
     )
     assert proc.returncode == 0
+
+
+# ── H4: xlsx 신호 + 죽은 상수 제거 ────────────────────────────────────
+
+def test_xlsx_engine_signal_triggers():
+    # openpyxl 기반 xlsx 생성 명령이 리마인더를 발화해야 한다 (H4: xlsx 누락 수리)
+    assert is_doc_build("python3 -c 'from openpyxl import Workbook; ...'")
+
+
+def test_xlsx_named_script_triggers():
+    # 빌더 권장 경로의 xlsx 스크립트 실행도 발화해야 한다
+    assert is_doc_build("python3 build_xlsx_report.py")
+
+
+def test_dead_doc_exts_removed():
+    # H4: 죽은 상수가 다시 생기지 않도록 — 모듈에 DOC_EXTS가 없어야 한다
+    assert not hasattr(mod, "DOC_EXTS")
