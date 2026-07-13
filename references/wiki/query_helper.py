@@ -39,6 +39,34 @@ def tokenize(text):
     return tokens
 
 
+def safe_wiki_path(wiki_root, category, filename):
+    """KN-3: validate a wiki write target BEFORE any Write into .omd/wiki/**.
+    Rejects separators, '..' and dot-prefixed segments, then re-checks the
+    resolved path still sits under wiki_root (belt and braces)."""
+    for part in (category, filename):
+        if (not part or "/" in part or "\\" in part or ".." in part
+                or part.startswith(".")):
+            raise ValueError(f"unsafe wiki path segment: {part!r}")
+    root = os.path.realpath(wiki_root)
+    target = os.path.realpath(os.path.join(root, category, filename))
+    if os.path.commonpath([root, target]) != root:
+        raise ValueError(f"resolved path escapes wiki root: {target}")
+    return os.path.join(wiki_root, category, filename)
+
+
+def title_to_slug(title):
+    """KN-4: English-keyword slug even for Korean topics (paraphrase to English
+    keywords upstream when possible). No ASCII token at all -> deterministic
+    sha256 8-hex fallback. The hash fallback lives HERE, in write code — an LLM
+    must never improvise a hash (non-deterministic across sessions)."""
+    words = re.findall(r"[a-z0-9]+", unicodedata.normalize("NFKC", title or "").lower())
+    slug = "-".join(words)[:64].strip("-")
+    if slug:
+        return slug + ".md"
+    digest = hashlib.sha256((title or "").encode("utf-8")).hexdigest()[:8]
+    return f"note-{digest}.md"
+
+
 def match(store_dir, query, limit=10):
     """Rank a category dir's .md files by token overlap with the query.
     Deterministic (overlap desc, then name asc); [] when the dir is absent."""
@@ -68,6 +96,9 @@ def main(argv):
     if len(argv) >= 3 and argv[0] == "match":
         for name, score in match(argv[1], " ".join(argv[2:])):
             print(f"{score}\t{name}")
+        return 0
+    if len(argv) >= 2 and argv[0] == "slug":
+        print(title_to_slug(" ".join(argv[1:])))
         return 0
     print("usage: query_helper.py tokenize <text> | match <dir> <text> | slug <title>",
           file=sys.stderr)

@@ -66,5 +66,45 @@ class TestMatch(unittest.TestCase):
             self.assertIn("defense-defect-patterns.md", out.stdout)
 
 
+class TestSafeWikiPath(unittest.TestCase):
+    def test_accepts_normal(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            p = qh.safe_wiki_path(tmp, "convention", "lab-style-spec.md")
+            self.assertTrue(p.endswith(os.path.join("convention", "lab-style-spec.md")))
+
+    def test_rejects_traversal_shapes(self):
+        for cat, name in [("convention", "../escape.md"),
+                          ("convention", "a/b.md"),
+                          ("convention", "a\\b.md"),
+                          ("..", "x.md"),
+                          ("convention", ".hidden.md"),
+                          ("", "x.md")]:
+            with self.assertRaises(ValueError, msg=f"{cat!r}/{name!r}"):
+                qh.safe_wiki_path("/tmp/omd-wiki-root", cat, name)
+
+
+class TestTitleToSlug(unittest.TestCase):
+    def test_english_keywords(self):
+        self.assertEqual(qh.title_to_slug("Defense deck defect patterns"),
+                         "defense-deck-defect-patterns.md")
+
+    def test_mixed_keeps_ascii_only(self):
+        self.assertEqual(qh.title_to_slug("IEEE 캡션 rule"), "ieee-rule.md")
+
+    def test_pure_korean_falls_back_to_hash(self):
+        a = qh.title_to_slug("디펜스 자료 결함")
+        b = qh.title_to_slug("디펜스 자료 결함")
+        self.assertEqual(a, b)  # 결정론
+        self.assertRegex(a, r"^note-[0-9a-f]{8}\.md$")
+
+    def test_cli_slug(self):
+        out = subprocess.run(
+            [sys.executable, os.path.join(HELPER_DIR, "query_helper.py"),
+             "slug", "Defense deck defect patterns"],
+            capture_output=True, text=True)
+        self.assertEqual(out.stdout.strip(), "defense-deck-defect-patterns.md")
+
+
 if __name__ == "__main__":
     unittest.main()
