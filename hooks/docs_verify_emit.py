@@ -224,6 +224,9 @@ def main() -> int:
     except Exception:
         return 0  # fail-open: 입력 파싱 실패해도 세션 막지 않음
 
+    if not isinstance(payload, dict):
+        return 0  # fail-open: valid JSON but not an object
+
     tool = payload.get("tool_name", "")
     if tool in ("Edit", "Write"):
         return handle_md_edit(payload)

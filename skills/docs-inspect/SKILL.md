@@ -35,10 +35,10 @@ The format's rubric card is the single source of truth — office: references/ru
    `Task(subagent_type="oh-my-docs:doc-inspector", ...)`
 2. The inspector gathers evidence the way the rubric card prescribes (office: render all slides at ≥150dpi and read them; text genres: fresh-read every file) → ranks per-axis improvements by impact.
 
-**Multi-lens (large deck / precise review)** — 3 lenses in parallel (ralplan critic pattern):
+**Multi-lens (large deck / precise review)** — one lens per rubric-card axis, in parallel (ralplan critic pattern):
 1. Dispatch doc-inspector **in parallel, one per axis of the format's rubric card** (office: Content / Design / Coherence; repo-docs: the card's qualitative axes):
    `Task(subagent_type="oh-my-docs:doc-inspector", ...)` × N (axis specified via prompt)
-2. Merge the 3 lens results, integrating them by impact rank with no per-axis conflicts.
+2. Merge the per-axis lens results, integrating them by impact rank with no per-axis conflicts.
 
 **Common**:
 3. Present the ranked improvement list to the user (advice — not a verdict).
