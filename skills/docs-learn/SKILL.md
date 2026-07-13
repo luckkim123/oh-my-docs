@@ -76,6 +76,12 @@ human gate.
 
 ## Steps
 
+0. **wiki health report (G3, report-only)**: run the mechanical linter over both wiki levels —
+   `python3 <plugin>/references/wiki/lint_wiki.py --root .omd/wiki` (and, if an ancestor `.omd/`
+   exists, once more with `--root <ancestor>/.omd/wiki`). Surface the report to the user as-is
+   (stale / oversized / broken-ref / near-duplicate / missing-confidence). The linter never
+   modifies anything and always exits 0 — findings are review input for this gate, not a block.
+   python3 unavailable → skip with one line (degrade, fail-open).
 1. Read `.omd/learned.md`, collect `status: candidate` observations.
 2. Delegate each candidate to `oh-my-docs:doc-inspector` for promotion-eligibility judgment (read-only):
    - `Task(subagent_type="oh-my-docs:doc-inspector", ...)` to review each OBS's repetition,

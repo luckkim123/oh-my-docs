@@ -30,3 +30,10 @@ def test_referenced_paths_exist():
             if not (ROOT / ref).exists():
                 missing.append(f"{f.relative_to(ROOT)} → {ref}")
     assert not missing, "dangling references:\n" + "\n".join(sorted(set(missing)))
+
+
+def test_docs_learn_calls_wiki_lint():
+    """G3: docs-learn's steps run the report-only linter before promotion review."""
+    body = (ROOT / "skills" / "docs-learn" / "SKILL.md").read_text(encoding="utf-8")
+    assert "lint_wiki.py" in body
+    assert "report-only" in body
