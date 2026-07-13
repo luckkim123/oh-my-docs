@@ -41,7 +41,7 @@ the E2E pilot.
 - Carryover cosmetics: plugin description and README name the text genres; doc-planner
   checklist asks for "exactly one structure frame" instead of a narrative arc.
 
-> **Verification**: python3 -m pytest tests/ -q — 136 passed (Task 11 Step 3 실측값 기입) ·
+> **Verification**: python3 -m pytest tests/ -q — 136 passed ·
 > site pilot gates measured green: `mkdocs build --strict` exit 0 + markdownlint-cli2 exit 0
 > (logs under `.omd/omd-site/verify-runs/`, uncommitted by policy).
 
