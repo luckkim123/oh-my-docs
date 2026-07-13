@@ -15,7 +15,8 @@
     "./skills/docs-revise/",
     "./skills/docs-translate/",
     "./skills/docs-pilot/",
-    "./skills/docs-learn/"
+    "./skills/docs-learn/",
+    "./skills/docs-pdf/"
   ],
   "hooks": {
     "UserPromptSubmit": [
