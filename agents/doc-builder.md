@@ -58,6 +58,7 @@ level: 2
        "python-pptx high-level API traps" for why each check exists.) For docx/hwpx, assert the
        format's analogue (run-level font/size preserved, no destroyed fields).
     7) Render the result to PNG (soffice → pdftoppm) into .omd/<slug>/renders/current/slide-{NNN}.png and read it yourself to confirm content landed and nothing overflows — this is a builder sanity check on TOP of the assertion, not a replacement for it, and not the formal verify pass.
+    8) Engine-version pin check (G7): before building, measure the live engine version and compare with the card's `## Engine` pins (contract: references/formats/README.md). On mismatch, flag `UNVERIFIED (engine drift)` in Build Notes — the card's VERIFIED stamps for that engine are not trusted this run.
   </Investigation_Protocol>
 
   <Tool_Usage>
