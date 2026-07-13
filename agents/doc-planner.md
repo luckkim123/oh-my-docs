@@ -55,7 +55,7 @@ disallowedTools: Write, Edit, NotebookEdit
     > **When this fires**: only when docs-plan invokes you in `--consensus` mode, or a *Deliberate trigger* applies. In `--direct` mode (default) produce a single outline and skip this section. This absorbs the OMC architect/plan responsibilities (forcing alternatives, tradeoffs, decision record) into the planner *without a separate architect agent* (boundary rule T1). Isomorphic to the paper-side scholar-planner protocol — document domain.
 
     **Short vs Deliberate (auto-detect)**:
-    - **Deliberate trigger** (any one): defense / committee review / external official talk. Run the full protocol below.
+    - **Deliberate trigger** (any one): defense / committee review / external official talk or publication (an externally published docs site counts). Run the full protocol below.
     - **Short**: otherwise. Principles + 2 Options + a compact ADR only; skip pre-mortem and expanded rehearsal plan.
 
     1) **Principles (3-5)**: the principles governing this structure decision. E.g. "evidence over narrative", "scanability over depth", "respect the audience attention budget".
@@ -112,7 +112,7 @@ disallowedTools: Write, Edit, NotebookEdit
   </Examples>
 
   <Final_Checklist>
-    - Did I choose exactly one narrative arc *for the outline* and justify it against the tone preset? (`--consensus`: did the ≥2 Options in plan.md converge to exactly one Final arc?)
+    - Did I choose exactly one structure frame *for the outline* (office: narrative arc vs the tone preset; repo-docs: section preset; site: quadrant map) and justify it? (`--consensus`: did the ≥2 Options in plan.md converge to exactly one Final frame?)
     - Does every outline entry have purpose + key message + required asset?
     - Is every required section placed?
     - Did I respect the format's density limits?

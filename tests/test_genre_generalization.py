@@ -153,3 +153,16 @@ def test_themes_declared_office_only():
     text = _ref("themes/README.md")
     assert "Office formats only" in text
     assert "repo-docs" in text              # 텍스트 장르 폴백의 소재지 명시 (F8)
+
+
+# ── T10: R2 이월 코스메틱 소진 (결정 8) ────────────────────────────────
+
+def test_plugin_description_names_text_genres():
+    import json
+    meta = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+    assert "repo-docs" in meta["description"] and "site" in meta["description"]
+
+
+def test_planner_checklist_generalized_beyond_arc():
+    body = _agent("doc-planner")
+    assert "exactly one structure frame" in body   # arc 고정 어휘 해소 (R2 이월)
