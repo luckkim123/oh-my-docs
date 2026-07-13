@@ -165,7 +165,7 @@ order = version number order = sort order, always.
 ### 3.4 Ownership guard (G6)
 
 Before **overwriting or deleting anything under `outputs/<slug>/current/`** (artifact-set
-rebuilds, revise loops, any cleanup that would touch it), consult `.omd/<slug>/manifest.json`:
+rebuilds, revise loops), consult `.omd/<slug>/manifest.json`:
 
 1. **Not listed in `paths[]`** → omd did not write it (a user file may have landed inside
    `current/`). Never touch it silently — AskUserQuestion (overwrite/delete vs keep).
