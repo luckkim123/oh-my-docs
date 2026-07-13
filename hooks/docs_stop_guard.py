@@ -9,11 +9,14 @@ exits immediately when stop_hook_active (G1-chk).
 """
 import json
 import os
+import re
 import sys
 import time
 
 SENTINEL = ".verify-pending"
 STALE_AFTER = 6 * 3600  # older = carried over from an earlier session (HK-4; no TTL expiry)
+EVIDENCE_LOG = "stage-evidence.log"
+PILOT_STAGES = ("1", "2", "3", "4", "5", "6")  # intake..verify (docs-pilot Steps 1-6)
 
 
 def pending_sentinels(root: str):
@@ -47,6 +50,42 @@ def build_message(items):
     )
 
 
+def stage_evidence_gaps(root):
+    """G5: recent pilot runs (log mtime within STALE_AFTER) missing stage markers.
+
+    The mtime cutoff is a NAMED exception to HK-4 (never silence stale leftovers):
+    .verify-pending marks UNRESOLVED work so carry-overs stay visible, but this log
+    is a finished run's delegation audit trail with no clearing event — re-warning
+    every Stop about long-gone runs would reintroduce alert fatigue (spec §7 ⑥)."""
+    gaps = []
+    if not os.path.isdir(root):
+        return gaps
+    now = time.time()
+    for d in sorted(os.listdir(root)):
+        log = os.path.join(root, d, EVIDENCE_LOG)
+        try:
+            if not os.path.isfile(log) or now - os.path.getmtime(log) > STALE_AFTER:
+                continue
+            body = open(log, encoding="utf-8", errors="replace").read()
+        except OSError:
+            continue
+        seen = set(re.findall(r"OMD stage (\d)", body))
+        missing = [n for n in PILOT_STAGES if n not in seen]
+        if missing:
+            gaps.append((d, missing))
+    return gaps
+
+
+def build_evidence_message(gaps):
+    lines = [f"  - {slug}: stage {', '.join(missing)}" for slug, missing in gaps]
+    return (
+        "[OMD stage-evidence] 최근 pilot 실행에서 spawned/skipped 마커가 없는 스테이지:\n"
+        + "\n".join(lines)
+        + "\n마커가 없다는 것은 해당 스테이지가 위임 없이 인라인 처리됐을 수 있다는 뜻입니다"
+        " (author≠reviewer 분리 약화). advisory입니다 — 의도적 인라인이었다면 무시하세요."
+    )
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -54,12 +93,19 @@ def main() -> int:
             return 0  # G1-chk: never re-fire inside a stop-hook continuation
         root = os.path.join(payload.get("cwd") or os.getcwd(), ".omd")
         items = pending_sentinels(root)
+        gaps = stage_evidence_gaps(root)
+        blocks = []
         if items:
+            blocks.append(build_message(items))
+        if gaps:
+            blocks.append(build_evidence_message(gaps))
+        if blocks:
+            message = "\n\n".join(blocks)
             print(json.dumps({
-                "systemMessage": build_message(items),
+                "systemMessage": message,
                 "hookSpecificOutput": {
                     "hookEventName": "Stop",
-                    "additionalContext": build_message(items),
+                    "additionalContext": message,
                 },
             }))
     except Exception:

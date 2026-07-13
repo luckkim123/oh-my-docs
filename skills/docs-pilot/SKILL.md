@@ -35,6 +35,11 @@ Automatically orchestrates every stage from brief to finished document (intent c
   - **.md is the default**: write/append directly to `.omd/notepad.md`. If the notepad MCP is available, you may mirror it via `notepad_write_priority(...)` (same .md target, optional acceleration) — without it, the same behavior is achieved by writing the .md, not an error. Contract (3 tiers, pruning, compaction-survival): `references/notepad.md`.
 - The workspace path is fixed at **`.omd/<slug>/`** (a verified real path; do not bolt on unverified sub-segments like `.omd/specs` or `sessions/{sid}`).
   - ⚠️ **30s trap (only relevant if a state MCP is introduced later — not applied now)**: if you start using a state MCP, do not call `state_clear` *right before* a stage handoff (for 30s it disables the stop-hooks of all modes, silently breaking the loop). Use `state_write(active=false)` for non-terminal handoffs, and `state_clear` *only at the terminal (full pipeline shutdown)*. **Currently no state MCP is actually called (.md/`.omd/` files are the default), so this is a purely forward-looking note.**
+- **Stage-evidence markers (G5)**: at every stage 1–6 decision, append exactly one line to
+  `.omd/<slug>/stage-evidence.log` — `OMD stage <n> <name> → spawned oh-my-docs:doc-<agent>`
+  when dispatching, or `OMD stage <n> <name> → skipped: <reason>` when the skip condition
+  holds. The Stop guard greps this log and flags stages with neither marker (advisory) —
+  the delegation-evidence trail is how "the pilot quietly did a stage inline" gets caught.
 </Execution_Policy>
 
 <Steps>
