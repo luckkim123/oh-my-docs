@@ -38,7 +38,7 @@ Analyze several existing documents to inductively extract the *common* standard 
 2. Dispatch doc-analyzer to each document, extracting each one's design system:
    `Task(subagent_type="oh-my-docs:doc-analyzer", ...)`
 3. Induce the **common denominator** (fonts/colors/margins/layouts recurring across multiple documents) from the extraction results → style spec.
-4. Round-trip verification: regenerate one representative page from the spec → compare against the original. If <85%, reinforce the spec.
+4. Fidelity check per the Gate above — render-capable office formats: regenerate one representative page → compare PNGs against the original (≥85%; if below, reinforce the spec); text genres: cross-check the extracted spec against the card's standard-convention checklist.
 5. Present the style spec as the gate → confirm.
 </Steps>
 
