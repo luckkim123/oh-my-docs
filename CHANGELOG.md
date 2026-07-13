@@ -15,6 +15,47 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-14
+
+R4 "knowledge lifecycle" — the capture-then-curate loop closes: query helpers make the
+wiki safely writable and searchable across CJK/English, lint gives it a health signal,
+notepad survives compaction, and stop-guard/ownership gates keep pilot runs honest
+(spec: `docs/superpowers/specs/2026-07-11-omd-program-design.md` §5 R4).
+
+### Added
+- **`query_helper` wiki write/query guards**: CJK bi-gram tokenizer + match (KN-2, README
+  contract repayment), `safe_wiki_path` resolve-prefix guard against symlinked category
+  escape (KN-3), `title_to_slug` English slug rule (KN-4) — wired into `docs-pilot` Step 7
+  and `docs-learn` Steps 4/6.
+- **`lint_wiki` (G3)**, adapted from omx — a report-only store auditor; `docs-learn` Step 0
+  now runs it as a wiki health report before promotion.
+- **`precompact_reinject` hook (G2)**: notepad 3-tier contract, prunes on `PreCompact` and
+  reinjects on `SessionStart(compact)` so pilot state survives context compaction.
+- **Stage-evidence markers + stop-guard gap grep (G5)**: `docs_stop_guard` gains a second
+  advisory check beyond G1's verify-pending reminder — flags recent pilot runs (within
+  `STALE_AFTER`) missing stage markers; `docs-pilot` now emits the markers it checks for.
+- **Ownership guard (G6)**: manifest-checked overwrite/delete gate in
+  `references/output-layout.md` §3.4, wired into `docs-build`/`docs-pilot`/`docs-revise`
+  and `doc-builder`.
+- **OBS capture path (§4.5c)**: `docs-pilot` Step 7b plus 3 observing stages
+  (`docs-inspect`, `docs-standardize`, `docs-verify`) complete the capture-then-curate
+  loop — observations captured during those stages now have a defined path into the wiki.
+
+### Changed
+- **Wiki README contract** (`references/wiki/README.md`): CJK bi-gram tokenizer pointer
+  (KN-2), home-directory ascent floor for the global-wiki search (ST-3), English slug rule
+  (KN-4), and `safe_wiki_path`/`title_to_slug` write-site wiring (KN-3/KN-4) documented
+  alongside the existing two-level contract.
+- **`docs-learn` Step 0** now wires in the wiki lint health report (G3) ahead of promotion.
+- **`docs_stop_guard`** extended past its original G1 verify-pending reminder (0.1.0) to
+  also run the G5 stage-marker gap grep — same hook, same advisory/fail-open/re-entry-safe
+  posture, second check.
+
+> **Verification**: `python3 -m pytest -q` — 175 passed (R3 baseline 136).
+
+> **Notes**: LOCAL ONLY — marketplace update + app restart required after merge (spec §7
+> ⑤). This closes the R1–R4 knowledge-lifecycle release train (spec §5).
+
 ## [0.3.0] - 2026-07-14
 
 Site genre: MkDocs + Material static documentation sites join the harness as a card

@@ -70,8 +70,11 @@ deliverables with a manifest), and this README/CHANGELOG regenerated through tha
 (dogfooding).
 R3 v0.3.0 adds the site genre — MkDocs + Material card with machine-measured engine
 stamps, `mkdocs build --strict` as the deterministic gate, Diátaxis structure frames, and
-omd's own docs site built as the E2E pilot (fixture-pinned dogfood guard). Roadmap: R4
-knowledge lifecycle.
+omd's own docs site built as the E2E pilot (fixture-pinned dogfood guard).
+R4 v0.4.0 closes the knowledge lifecycle — CJK/English wiki write and query guards,
+report-only wiki lint feeding `docs-learn`, a notepad contract that survives context
+compaction, stop-guard and ownership gates over pilot runs, and the observing-stage
+capture-then-curate loop. This completes the R1–R4 release train.
 
 ## Architecture
 
