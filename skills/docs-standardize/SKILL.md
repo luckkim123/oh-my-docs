@@ -21,7 +21,7 @@ Analyze several existing documents to inductively extract the *common* standard 
 </Use_When>
 
 <Do_Not_Use_When>
-- When there is **no** existing document to reference at all → skip (build uses the default tone preset)
+- When there is **no** existing document to reference at all → skip (build uses the default tone preset — the concrete fallback is `references/themes/` (10 font/color presets); offer those instead of guessing)
 - When analyzing just a single document/page is enough → use doc-analyzer directly (no induction needed)
 </Do_Not_Use_When>
 
