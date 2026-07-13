@@ -133,8 +133,11 @@ def test_build_knowledge_table_lists_site():
 
 def test_build_gate_generalized_beyond_png():
     body = _skill("docs-build")
-    assert "fresh-read" in body              # 텍스트 장르 sanity 증거
-    assert "PNG" in body                     # 오피스 증거는 보존
+    gate = body.split("<Gate>")[1].split("</Gate>")[0]
+    steps = body.split("<Steps>")[1].split("</Steps>")[0]
+    scoped = gate + steps                    # 어디서든 등장이 아니라 Gate·Steps 절에 국한
+    assert "fresh-read" in scoped            # 텍스트 장르 sanity 증거
+    assert "PNG" in scoped                   # 오피스 증거는 보존
 
 
 def test_learning_protocol_has_text_genre_boundary():
