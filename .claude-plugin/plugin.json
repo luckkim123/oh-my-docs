@@ -1,7 +1,7 @@
 {
   "name": "oh-my-docs",
-  "version": "0.2.0",
-  "description": "Multi-agent orchestration harness specialized for document work (pptx/docx/xlsx/hwpx)",
+  "version": "0.3.0",
+  "description": "Multi-agent orchestration harness specialized for document work (office: pptx/docx/xlsx/hwpx · text genres: repo-docs, site)",
   "author": { "name": "kimseungmin" },
   "license": "MIT",
   "keywords": ["claude-code", "plugin", "documents", "pptx", "docx", "xlsx", "orchestration", "multi-agent"],

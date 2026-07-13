@@ -10,7 +10,7 @@ description: |
 # docs-intake — Intent Clarification (Stage 1)
 
 <Purpose>
-Narrow a vague document request into an actionable spec. Crystallize what (format/kind), for whom (audience), why (purpose), and which genre frame — the card defines each genre's intake questions (office: tone preset (defense/conference/lecture); repo-docs: artifact-set scope + genre section preset) — through Socratic questions. The document-side counterpart of OMC deep-interview.
+Narrow a vague document request into an actionable spec. Crystallize what (format/kind), for whom (audience), why (purpose), and which genre frame — the card defines each genre's intake questions (office: tone preset (defense/conference/lecture); repo-docs: artifact-set scope + genre section preset; site: Diátaxis scope + nav depth + palette) — through Socratic questions. The document-side counterpart of OMC deep-interview.
 </Purpose>
 
 <Use_When>
@@ -28,9 +28,10 @@ Narrow a vague document request into an actionable spec. Crystallize what (forma
 **Gate 0 — Intent locked.** Passes when all of the below are answered; if any is empty, ask:
 What (format + document kind) · Who (audience) · Why (purpose) · Tone (preset) · Input (location of source material).
 
-For set genres (repo-docs), additionally lock the **artifact-set scope** before format·kind —
-full set / README only / community-health only (the card's set-scope gate); the choice lands
-in the D4 manifest `role` fields.
+For set genres (repo-docs, site), additionally lock the **artifact-set scope** before format·kind —
+repo-docs: full set / README only / community-health only; site: full site / a single Diátaxis
+quadrant / single-page revision (each card's set-scope gate); the choice lands in the D4
+manifest `role` fields.
 </Gate>
 
 <Steps>

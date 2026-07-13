@@ -340,3 +340,51 @@ def test_md_edit_fail_open_on_missing_file_path(tmp_path):
     )
     assert proc.returncode == 0
     assert proc.stdout.strip() == ""
+
+
+# ── R3: mkdocs 신호 (결정 2 — verify-우선 매칭) ───────────────────────
+
+def test_mkdocs_plain_build_arms_sentinel(tmp_path):
+    """plain `mkdocs build` = 산출 빌드 → site 리마인더 + 센티널 arm."""
+    slug = _with_slug(tmp_path)
+    out = run_hook(
+        f"uvx --from mkdocs --with mkdocs-material mkdocs build "
+        f"-f outputs/{slug}/current/mkdocs.yml -d .omd/{slug}/site-build",
+        cwd=str(tmp_path),
+    )
+    assert (tmp_path / ".omd" / slug / ".verify-pending").is_file()
+    assert out.strip() != ""
+    assert "--strict" in out     # 오피스 shape-assertion 문구가 아니라 site 카드 gate 안내
+
+
+def test_mkdocs_strict_build_clears_sentinel(tmp_path):
+    """`mkdocs build --strict` = 카드 gate ① verify 실행 → arm 아니라 clear (결정 2)."""
+    slug = _with_slug(tmp_path)
+    sentinel = tmp_path / ".omd" / slug / ".verify-pending"
+    sentinel.write_text("{}")
+    out = run_hook(
+        f"uvx --from mkdocs --with mkdocs-material mkdocs build --strict "
+        f"-f outputs/{slug}/current/mkdocs.yml -d .omd/{slug}/site-build",
+        cwd=str(tmp_path),
+    )
+    assert not sentinel.exists(), "strict run must clear, not re-arm"
+    assert out.strip() == ""     # verify 실행에 빌드 리마인더를 얹지 않음
+
+
+def test_office_verify_signals_regression(tmp_path):
+    """verify-우선 매칭 도입 후에도 기존 3신호(clear)·빌드신호(arm) 동작 무변."""
+    slug = _with_slug(tmp_path)
+    sentinel = tmp_path / ".omd" / slug / ".verify-pending"
+    sentinel.write_text("{}")
+    run_hook(f"pdftoppm -png outputs/{slug}/x.pdf p", cwd=str(tmp_path))
+    assert not sentinel.exists()
+    run_hook("python3 -c 'from pptx import Presentation'", cwd=str(tmp_path))
+    assert (tmp_path / ".omd" / ".verify-pending").is_file()  # slug 무언급 → 루트 센티널
+
+
+def test_md_reminder_names_site_gate(tmp_path, monkeypatch):
+    """md Edit|Write 리마인더가 site 카드 gate 도 안내 (repo-docs 하드코딩 해소)."""
+    monkeypatch.setenv("OMD_REMINDER_COOLDOWN_SECONDS", "0")
+    slug = _with_slug(tmp_path)
+    out = run_md_hook(f"outputs/{slug}/current/docs/index.md", cwd=str(tmp_path))
+    assert "site" in out and "mkdocs build --strict" in out

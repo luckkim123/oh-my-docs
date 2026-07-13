@@ -57,16 +57,21 @@ no self-approval. `docs-pilot` orchestrates the full brief→document flow with 
 at each step. Meta skills: `docs-learn` (wiki promotion), `docs-pdf` (pdf as input/convert
 layer, never a generation format).
 
-**Formats**: pptx / docx / xlsx / hwpx (office, render-capable) and **repo-docs**
-(README/CHANGELOG/community-health set, text genre). Each format's tools/traps/formula
-knowledge lives in its own card under `references/formats/` — the single source of truth
-OMD's builder and verifier agents read instead of wrapping existing skills.
+**Formats**: pptx / docx / xlsx / hwpx (office, render-capable) and the text genres
+**repo-docs** (README/CHANGELOG/community-health set) and **site** (MkDocs + Material
+static docs site). Each format's tools/traps/formula knowledge lives in its own card under
+`references/formats/` — the single source of truth OMD's builder and verifier agents read
+instead of wrapping existing skills.
 
 **Status**: R1 v0.1.0 shipped the four office format cards + core verify/hygiene gates.
 R2 v0.2.0 adds the repo-docs genre — card-delegated gates generalized across the builder/
 verifier/inspect/standardize/revise skill pair, an artifact-set output layout (multi-file
 deliverables with a manifest), and this README/CHANGELOG regenerated through that pipeline
-(dogfooding). Roadmap: R3 MkDocs site genre → R4 knowledge lifecycle.
+(dogfooding).
+R3 v0.3.0 adds the site genre — MkDocs + Material card with machine-measured engine
+stamps, `mkdocs build --strict` as the deterministic gate, Diátaxis structure frames, and
+omd's own docs site built as the E2E pilot (fixture-pinned dogfood guard). Roadmap: R4
+knowledge lifecycle.
 
 ## Architecture
 
@@ -78,8 +83,8 @@ skills/       docs-intake · docs-standardize · docs-plan · docs-build · docs
               docs-verify · docs-convert · docs-revise · docs-translate · docs-pilot ·
               docs-learn · docs-pdf
 agents/       doc-analyzer · doc-planner · doc-builder · doc-inspector · doc-verifier
-references/   formats/ (pptx, docx, xlsx, hwpx, pdf, repo-docs) · rubrics/ (ppteval,
-              repo-docs-rubric) · themes/ (10 office fallback presets) · wiki/ ·
+references/   formats/ (pptx, docx, xlsx, hwpx, pdf, repo-docs, site) · rubrics/ (ppteval,
+              repo-docs-rubric, site-rubric) · themes/ (10 office fallback presets) · wiki/ ·
               output-layout.md · learning-protocol.md
 hooks/        route_emit.py (UserPromptSubmit routing) · docs_verify_emit.py
               (PostToolUse verify reminder, Bash + Edit|Write) · docs_stop_guard.py ·

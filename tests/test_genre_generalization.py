@@ -59,6 +59,15 @@ def test_repo_docs_rubric_exists_and_splits_axes():
         assert lens in text, f"qualitative lens {lens!r} missing"
 
 
+def test_site_rubric_exists_and_splits_axes():
+    text = _ref("rubrics/site-rubric.md")
+    assert "verify gate" in text          # 기계 축(빌드/링크)은 카드 게이트 소관 명시
+    assert "Diátaxis" in text             # 정보 구조 축의 프레임 원출처
+    assert "no self-approval" in text     # ppteval·repo-docs 와 동일한 분리 규칙
+    for lens in ("Information architecture", "Prose quality"):
+        assert lens in text, f"qualitative lens {lens!r} missing"
+
+
 # ── T8: 앞단 스킬 (§4.4-8/F7 — 발표 어휘 하드코딩 해소) ────────────────
 
 def test_intake_genre_frames_from_card():
@@ -68,6 +77,12 @@ def test_intake_genre_frames_from_card():
     assert "weakest component" in body       # PL-1: 컴포넌트 최솟값 판정
     assert "PR-1" in body                    # 재수렴 신호
     assert "defense/conference/lecture" in body  # 오피스 사례 보존
+
+
+def test_intake_names_site_frame():
+    body = _skill("docs-intake")
+    assert "Diátaxis" in body                # site 의 장르 프레임
+    assert "repo-docs, site" in body         # 세트 스코프 게이트가 site 도 커버
 
 
 def test_plan_structure_frame_from_card():
@@ -97,11 +112,32 @@ def test_analyzer_has_input_boundary_and_genre_frame():
     assert "genre frame" in body
 
 
+def test_analyzer_genre_frame_covers_site():
+    body = _agent("doc-analyzer")
+    assert "Diátaxis" in body
+    assert "mkdocs.yml" in body              # site 입력 화이트리스트의 구체물
+
+
 # ── T11: 소형 묶음 (§4.4-10~13) ───────────────────────────────────────
 
 def test_build_knowledge_table_lists_repo_docs():
     body = _skill("docs-build")
     assert "repo-docs" in body and "references/formats/repo-docs.md" in body
+
+
+def test_build_knowledge_table_lists_site():
+    body = _skill("docs-build")
+    assert "references/formats/site.md" in body
+    assert "site-build" in body              # built HTML 은 current/ 밖 (결정 4)
+
+
+def test_build_gate_generalized_beyond_png():
+    body = _skill("docs-build")
+    gate = body.split("<Gate>")[1].split("</Gate>")[0]
+    steps = body.split("<Steps>")[1].split("</Steps>")[0]
+    scoped = gate + steps                    # 어디서든 등장이 아니라 Gate·Steps 절에 국한
+    assert "fresh-read" in scoped            # 텍스트 장르 sanity 증거
+    assert "PNG" in scoped                   # 오피스 증거는 보존
 
 
 def test_learning_protocol_has_text_genre_boundary():
@@ -120,3 +156,16 @@ def test_themes_declared_office_only():
     text = _ref("themes/README.md")
     assert "Office formats only" in text
     assert "repo-docs" in text              # 텍스트 장르 폴백의 소재지 명시 (F8)
+
+
+# ── T10: R2 이월 코스메틱 소진 (결정 8) ────────────────────────────────
+
+def test_plugin_description_names_text_genres():
+    import json
+    meta = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+    assert "repo-docs" in meta["description"] and "site" in meta["description"]
+
+
+def test_planner_checklist_generalized_beyond_arc():
+    body = _agent("doc-planner")
+    assert "exactly one structure frame" in body   # arc 고정 어휘 해소 (R2 이월)

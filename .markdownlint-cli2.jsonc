@@ -1,9 +1,11 @@
 {
-  // repo-docs card exception layer (references/formats/repo-docs.md gate ③, D3 "customizable"
-  // tier). Every rule below is disabled ONLY because measured against pre-existing content
-  // this task is out of scope (or explicitly forbidden, plan decision 5) to rewrite —
-  // verified by re-running markdownlint against the pre-task CHANGELOG.md (commit ebd7c07):
-  // the identical 5 rules already fired 96 times before this task touched the file.
+  // text-genre exception layer (repo-docs + site) (references/formats/repo-docs.md gate ③,
+  // D3 "customizable" tier). Every rule below is disabled ONLY because measured against
+  // pre-existing content this task is out of scope (or explicitly forbidden, plan decision 5)
+  // to rewrite — verified by re-running markdownlint against the pre-task CHANGELOG.md
+  // (commit ebd7c07): the identical 5 rules already fired 96 times before this task touched
+  // the file. Config discovery applies this same layer to the site genre's docs/ tree
+  // (R3 Task 8) — an accepted shared exception, not a site-specific relaxation.
   "config": {
     // MD013 line-length: disabled — this repo uses no-hard-wrap prose (one sentence per
     // line can exceed 80/120 cols) across README/CHANGELOG; content-level length rules
