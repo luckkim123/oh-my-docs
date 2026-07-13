@@ -146,3 +146,30 @@ def test_no_absolute_paths_or_env_in_two_level_wiki_contract():
         # a hardcoded home path must never appear in the contract
         assert "/Users/" not in body
         assert "$HOME" not in body
+
+
+def test_ascent_home_floor_stated_at_both_descriptions():
+    """ST-3: BOTH ascent descriptions (layout diagram + contract pseudocode) carry the
+    home-directory hard floor. Deliberately no literal env token — the existing
+    test_no_absolute_paths_or_env_in_two_level_wiki_contract forbids it."""
+    text = _body(WIKI_README)
+    assert text.lower().count("never climbs above the user's home directory") >= 2
+
+
+def test_english_slug_rule_stated():
+    """KN-4: filenames are English-keyword slugs even for Korean topics."""
+    text = _body(WIKI_README)
+    assert "English-keyword" in text and "title_to_slug" in text
+
+
+def test_query_helper_pointer_present():
+    """KN-2: the promised CJK bi-gram matching now points at its implementation."""
+    assert "query_helper.py" in _body(WIKI_README)
+
+
+def test_wiki_write_sites_wired_to_guards():
+    """KN-3·KN-4: the ACTUAL .omd/wiki/** write sites call the guards — README prose alone
+    does not exercise them (ultracode blocking finding)."""
+    for rel in ("skills/docs-pilot/SKILL.md", "skills/docs-learn/SKILL.md"):
+        body = (ROOT / rel).read_text(encoding="utf-8")
+        assert "safe_wiki_path" in body and "title_to_slug" in body, rel
