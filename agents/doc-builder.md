@@ -40,7 +40,7 @@ level: 2
   <Investigation_Protocol>
     1) Read the approved outline and the analyzer's design-system report.
     2) Read references/formats/<format>.md — engine recipe, traps, formula path status, version policy.
-    3) If this is a revision, snapshot outputs/<slug>/current.pptx → .omd/<slug>/versions/v{NN}_{YYYY-MM-DD}_{summary}.pptx before editing.
+    3) If this is a revision, snapshot outputs/<slug>/current.pptx → .omd/<slug>/versions/v{NN}_{YYYY-MM-DD}_{summary}.pptx before editing. (Artifact-set genres: snapshot by copying the whole outputs/<slug>/current/ directory to .omd/<slug>/versions/v{NN}_{YYYY-MM-DD}_{summary}/ — same rule as Constraints.)
     4) Write the build script; place each outline unit; apply the design system.
     5) For each formula, use the card's VERIFIED path; if none, stop and report the gap.
     6) **MANDATORY mechanical shape assertion (the gate that catches v4/v5-class silent regressions).** (Office formats. Text genres run the card's self-gate analogue instead: the placeholder scan and lint items from the card's verify gate, before handing off.)
