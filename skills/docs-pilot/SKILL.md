@@ -69,7 +69,7 @@ Automatically orchestrates every stage from brief to finished document (intent c
    - **Aggregate** the cleanup targets in `.omd/<slug>/` (size, count): all of `renders/`·`gen-image/`·`tmp/` + old versions in `versions/` **excluding** the latest one and any user-specified milestones. To choose milestones, show the user the versions list.
    - **AskUserQuestion [clean up / keep]** — never auto-delete, default conservative (keep).
    - On "clean up" → **delete via a recoverable path** (no permanent `rm`): macOS `trash` (if absent, move to `~/.Trash`) / Linux `gio trash`·`trash-cli` / Windows PowerShell move-to-recycle-bin (`Shell.Application` ParseName+InvokeVerb('delete'), no permanent `Remove-Item` — documented, unverified) / in environments without a recycle bin (CI, containers) only after user re-confirmation of "permanent deletion".
-   - ⚠️ `outputs/<slug>/current.<ext>` (the user's asset) is **excluded** from aggregation and deletion — only mentioned. For the detailed procedure, see `references/output-layout.md` §5.
+   - ⚠️ `outputs/<slug>/current.<ext>` (the user's asset) is **excluded** from aggregation and deletion — only mentioned. For the detailed procedure, see `references/output-layout.md` §5. Anything inside `outputs/<slug>/current/` is never a cleanup target; rebuild-time overwrites go through the ownership guard (output-layout §3.4).
 
 > **`--from <stage>` entry point**: you can start from an intermediate stage — `intake|standardize|plan|build|inspect|verify`. intake's topology/ambiguity judgment is included in `--from intake`.
 </Steps>

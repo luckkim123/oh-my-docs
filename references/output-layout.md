@@ -162,6 +162,25 @@ order = version number order = sort order, always.
   `os.replace()` — a half-written manifest reads as "no manifest" and silently disables the
   ownership guard. Never open+truncate in place.
 
+### 3.4 Ownership guard (G6)
+
+Before **overwriting or deleting anything under `outputs/<slug>/current/`** (artifact-set
+rebuilds, revise loops, any cleanup that would touch it), consult `.omd/<slug>/manifest.json`:
+
+1. **Not listed in `paths[]`** → omd did not write it (a user file may have landed inside
+   `current/`). Never touch it silently — AskUserQuestion (overwrite/delete vs keep).
+2. **Listed but sha256 differs** from the manifest value (`shasum -a 256 <file>` on macOS,
+   `sha256sum` on Linux) → the user hand-edited it since the last build. Never clobber
+   silently — AskUserQuestion (their edit would be lost).
+3. **Manifest absent or unparseable** → treated as "no ownership evidence": same ask path.
+   (ST-1 atomic writes exist precisely so a half-written manifest reads as absent, §3.3.)
+
+Single-file genres (`current.<ext>`) keep their existing protection — the version snapshot
+(§3.1) before large edits. The guard is advisory-by-human-gate, not a hook: the asking is
+done by the skill/agent about to write (docs-build, docs-revise, doc-builder, pilot cleanup).
+`outputs/` deletion remains forbidden for cleanup regardless (§5.2 — this guard covers
+*rebuild overwrites*, which are legitimate but must not eat user edits).
+
 ---
 
 ## 4. gen-image / render PNG naming
@@ -235,3 +254,4 @@ order = version number order = sort order, always.
 - [ ] slug rule (§1.1) applied at intake (non-ASCII → ask once for an ASCII slug)
 - [ ] terminal cleanup (§5) goes through AskUserQuestion + trash + excludes `outputs/current.<ext>`
 - [ ] artifact-set genres write manifest.json atomically and snapshot current/ directory-wise
+- [ ] artifact-set overwrite/delete consults manifest.json first (§3.4) — unlisted or hash-drifted files go through AskUserQuestion
