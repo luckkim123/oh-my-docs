@@ -67,14 +67,14 @@ with required frontmatter (`name`, `about` — form schema: `description`).
   syntactically wrong line is **silently skipped** (GitHub raises no error — only a checker
   catches it). Paths are case-sensitive. [source: GitHub docs — Sources below]
 - **README ToC**: standard-readme requires a ToC only at 100+ lines — adding one to a short
-  README violates the spec exactly as omitting one from a long README does (gate ①).
+  README violates the spec exactly as omitting one from a long README does (gate ①). [source: standard-readme spec — accessed 2026-07-11]
 - **Placeholder look-alikes**: markdown link syntax `[text](url)` is legitimate — the
   placeholder scan (gate ⑦) targets prompt tokens (`[Insert …]`, TODO, TBD, CHANGEME,
   `your-*-here`, lorem), not link brackets. A naive `\[.*\]` grep false-positives on every
-  link; scan for the token patterns.
+  link; scan for the token patterns. [source: omd PL-3 design, spec §3.4 — 2026-07-11]
 - **Badge markdown**: a badge is an image-link `[![alt](img-url)](target-url)` — a bare
   image or a dead target reads as neglect (gate ⑥ checks form; target liveness is the
-  optional lychee item).
+  optional lychee item). [source: shields.io/GitHub badge convention — accessed 2026-07-11]
 
 ## Verify gate (docs-verify / doc-verifier run this — deterministic, exit-code first)
 
@@ -107,7 +107,7 @@ member change.
 
 Deliverables stay in `outputs/<slug>/current/`. The manifest `role` field records each
 file's repo-relative target (`README.md` → repo root; templates → `.github/ISSUE_TEMPLATE/…`;
-`CODEOWNERS` → root or `.github/`). Guidance: `cp -r` preserving relative paths per the
+`CODEOWNERS` → root, `.github/`, or `docs/`). Guidance: `cp -r` preserving relative paths per the
 `role` map. omd never writes into the user's repository itself (§8: producing is omd's
 lane, publishing is the user's).
 

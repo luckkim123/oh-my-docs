@@ -12,7 +12,7 @@ must carry them too; everything else is format-specific and free-form:
 1. **`## Engine`** — the borrowed tools, one table row per tool, each row pinning the
    **measured version** (e.g. `python-pptx` 1.0.2) and its verification status on this
    machine. A row without a version number is not a pin.
-2. **Hard traps** — API/format traps with `[VERIFIED ✓ — date]`-stamped evidence.
+2. **Hard traps** — API/format traps with `[VERIFIED ✓ — date]`-stamped evidence. Genre cards (repo-docs, site) whose traps cite external standards rather than machine measurements carry `[source: <standard> — accessed YYYY-MM-DD]` markers instead — a standards citation is not a machine measurement, and stamping it VERIFIED would be dishonest.
 3. **Version-snapshot policy** — how `.omd/<slug>/versions/` snapshots work for this format.
 
 Conditional: a `License_Note` section whenever material is borrowed from an external
