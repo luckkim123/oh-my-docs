@@ -36,3 +36,37 @@ def test_agent_model_policy():
         assert _frontmatter(name).get("model") == model, (
             f"{name}: frontmatter model must be {model} (spec §3.1 G4 / critique #2)"
         )
+
+
+# Final_Response_Contract (AC-1a): the markers each agent's Output_Format promises.
+# These are the strings downstream consumers (skills, humans) grep for — losing one
+# in a doc rewrite is a silent contract break (exactly how H2 happened).
+REQUIRED_MARKERS = {
+    "doc-verifier": ["### Verdict", "**Status**: PASS | FAIL"],
+    "doc-inspector": ["## Formative Review"],
+    "doc-planner": ["## Narrative Arc", "## Outline", "## Coverage Check"],
+    "doc-analyzer": ["## Source Inventory", "## Reference Design System"],
+    "doc-builder": ["## Artifact", "## Build Notes"],
+}
+
+# Self-approval ban is load-bearing prose for the two review lanes only (spec §3.4 AC-1a).
+SELF_APPROVAL_BANS = {
+    "doc-verifier": "never self-approve",
+    "doc-inspector": "never approve work",
+}
+
+
+def _body(name: str) -> str:
+    return (AGENTS_DIR / f"{name}.md").read_text(encoding="utf-8")
+
+
+def test_final_response_contract_markers():
+    for name, markers in REQUIRED_MARKERS.items():
+        body = _body(name)
+        for marker in markers:
+            assert marker in body, f"{name}: required output marker {marker!r} missing"
+
+
+def test_self_approval_ban_present():
+    for name, phrase in SELF_APPROVAL_BANS.items():
+        assert phrase in _body(name), f"{name}: self-approval ban phrase {phrase!r} missing"
