@@ -27,8 +27,7 @@ Fixes an existing document until verify gives a PASS. Repeats doc-builder (fixes
 
 <Execution_Policy>
 - **Definition of pass — the document counterpart of ralph's `passes:true`.** The acceptance criteria below must *all* be satisfied for a PASS. If any one falls short, it is not passed (no partial PASS):
-  1. Integrity 5/5 (zip CRC · engine parse · soffice convert · dangling rels · orphan master) — 4/5 is a FAIL.
-  2. Full PNG read-through (≥150dpi, text readable on every slide/page, including slides that were not changed).
+  1.–2. The pass definition follows doc-verifier's verdict on the **card-defined verify gate** for the target format, verbatim — office: integrity 5/5 (zip CRC · engine parse · soffice convert · dangling rels · orphan master; 4/5 is a FAIL) + full PNG read-through (≥150dpi, every slide/page including unchanged ones); text genres: the card's deterministic chain + fresh-read. This clause auto-tracks the verifier's card delegation — do not restate gate numbers here (PS-4).
   3. All required outline sections present.
   4. The FAIL defect from the previous round does not recur.
 - Each iteration: doc-builder fixes → doc-verifier verifies with fresh evidence (no reuse of prior verification).
@@ -43,7 +42,7 @@ Fixes an existing document until verify gives a PASS. Repeats doc-builder (fixes
 2. **Loop**:
    a. Fix: `Task(subagent_type="oh-my-docs:doc-builder", ...)` — FAIL items only (snapshot to `.omd/<slug>/versions/` for large fixes).
    b. Re-verify: `Task(subagent_type="oh-my-docs:doc-verifier", ...)` — fresh integrity 5/5 + full read-through.
-   c. All 4 acceptance criteria satisfied → terminate (PASS). If any one falls short, check whether it is the same defect recurring:
+   c. All acceptance criteria (4 items, 1.–2. combined above) satisfied → terminate (PASS). If any one falls short, check whether it is the same defect recurring:
       - Same defect 3rd time → stop and report "fundamental issue".
       - Max iterations reached → if the boulder extension condition (defects decreasing) is met, extend +3 once, otherwise stop and report.
       - Otherwise → record this round's FAIL defect and go back to (a).

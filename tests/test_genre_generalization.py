@@ -29,3 +29,20 @@ def test_inspect_skill_lens_composition_is_dynamic():
     assert "rubric card" in body
     assert "PS-3" in body
     assert "PPTEval" in body  # 오피스 3축은 그 카드의 사례로 보존
+
+
+# ── T5: docs-standardize / docs-revise (§4.4-6·7, F6/PS-2·PS-4) ───────
+
+def test_standardize_gate_branches_by_render_capability():
+    body = _skill("docs-standardize")
+    assert "convention checklist" in body   # 텍스트 장르 대체 게이트 (F6/PS-2)
+    assert "85%" in body                    # 렌더 가능 포맷의 기존 게이트 보존
+    assert "office" in body.lower()
+
+
+def test_revise_pass_definition_tracks_verifier():
+    body = _skill("docs-revise")
+    assert "card-defined verify gate" in body
+    assert "PS-4" in body
+    # recur-방지(포맷 불가지론) 항목은 유지
+    assert "does not recur" in body
