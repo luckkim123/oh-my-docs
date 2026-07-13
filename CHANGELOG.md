@@ -2,12 +2,58 @@
 
 All notable changes to oh-my-docs (omd).
 
-> **Versioning policy**: omd deliberately uses **commit-SHA versioning** (no individual release numbers).
-> This file tracks only the *contract change history* — when a surface that other
-> components (omha, the session LLM) depend on changes, such as a hook's emit format, it is recorded here. General content
-> changes have the git log as the SSOT. Tone unified with the OMS (oh-my-scholar) CHANGELOG.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/). Version
+SSOT: `.claude-plugin/plugin.json` `version`.
+
+> **Policy note (2026-07-13, R1)**: the earlier deliberate **commit-SHA versioning** policy is
+> superseded by the R1–R4 release train (spec: `docs/superpowers/specs/2026-07-11-omd-program-design.md` §5).
+> Entries below predating v0.1.0 were written under the old policy and stay as-is;
+> the git log remains the SSOT for pre-semver general content changes.
 
 ## [Unreleased]
+
+## [0.1.0] - 2026-07-13
+
+R1 "hygiene + core gates" — first semver release (release train: spec
+`docs/superpowers/specs/2026-07-11-omd-program-design.md` §5).
+
+### Added
+- Version SSOT: `plugin.json` `version` field + `tests/test_version_sync.py` (H3).
+- Distribution-axiom guard: `tests/test_distribution_axiom.py` — no personal home paths /
+  emails in shipped files, pattern-based per spec DT-3 (D8).
+- Skill context budget guard: `tests/test_skill_budget.py`, 100 KiB cap (IA-1).
+- Format-card authoring contract `references/formats/README.md` — required sections,
+  VERIFIED stamp grammar, **engine-drift demotion rule** (`UNVERIFIED (engine drift)`),
+  enforced by `tests/test_format_cards.py`; builder/verifier now run an engine-version
+  pin check (G7).
+- Agent contract guard `tests/test_agent_contract.py`: frontmatter model policy +
+  Final_Response_Contract markers + self-approval bans (AC-1a).
+- **model-guard hook** `hooks/model_guard.py` (PreToolUse Task): advisory warning on
+  explicit model overrides contradicting agent frontmatter, and on unknown
+  `oh-my-docs:*` agent names (G4).
+- **verify-pending handshake** (G1): `docs_verify_emit` arms `.omd/**/.verify-pending`
+  on document builds and clears it on verify signals; new Stop hook
+  `hooks/docs_stop_guard.py` lists still-pending documents at Stop — strictly advisory,
+  re-entry-safe (`stop_hook_active`), stale sentinels marked "carried over", never blocks.
+- Reminder cooldown: same-content verify reminders are throttled for 10 min
+  (`.omd/.hook-throttle.json`, `OMD_REMINDER_COOLDOWN_SECONDS` override) (HG-3).
+
+### Changed
+- **Versioning policy**: commit-SHA versioning → Keep a Changelog + SemVer (this file's
+  header note; user-ratified via R1 PR).
+- `doc-planner` frontmatter model opus → **sonnet**; Deliberate `--consensus` escalates
+  to opus at Task-call time in `docs-plan` (G4 precondition, spec critique #2).
+- Routing checkpoint pins **pdf as input/convert layer** (never a generation FORMAT) +
+  regression test (H5 decision).
+- README Status/Structure refreshed to the current inventory (H6).
+
+### Fixed
+- `docs-pdf` skill registered in plugin.json — was shipping dead (H1).
+- `docs-pilot` bilingual "식별자 스크럽" confidentiality anchor restored (H2).
+- `docs_verify_emit`: dead `DOC_EXTS` constant removed; xlsx engine signals
+  (openpyxl/xlsxwriter/Workbook() + xlsx-named scripts) now trigger the reminder (H4).
+- `references/themes/` fallback presets wired into docs-build / docs-standardize (H7).
 
 ### Added
 - **Build-time format-regression defense — pptx card API traps + post-build shape-assertion gate + standardize enforcement**

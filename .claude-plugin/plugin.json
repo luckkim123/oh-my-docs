@@ -1,5 +1,6 @@
 {
   "name": "oh-my-docs",
+  "version": "0.1.0",
   "description": "Multi-agent orchestration harness specialized for document work (pptx/docx/xlsx/hwpx)",
   "author": { "name": "kimseungmin" },
   "license": "MIT",
@@ -15,7 +16,8 @@
     "./skills/docs-revise/",
     "./skills/docs-translate/",
     "./skills/docs-pilot/",
-    "./skills/docs-learn/"
+    "./skills/docs-learn/",
+    "./skills/docs-pdf/"
   ],
   "hooks": {
     "UserPromptSubmit": [
@@ -38,6 +40,30 @@
             "type": "command",
             "command": "python3",
             "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/docs_verify_emit.py"]
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/model_guard.py"]
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/docs_stop_guard.py"]
           }
         ]
       }

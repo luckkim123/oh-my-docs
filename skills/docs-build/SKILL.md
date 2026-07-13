@@ -35,6 +35,7 @@ Per-format tools, pitfalls, math, and version policy are the **single source of 
 - docx → references/formats/docx.md (python-docx, math 2 paths [OMML editable VERIFIED + matplotlib fallback], header/PAGE field/Korean-font pitfalls)
 - xlsx → references/formats/xlsx.md (openpyxl/xlsxwriter routing, `<v>0</v>` formula-cache pitfall, structure-validation gate [not PNG read-through])
 - hwpx → references/formats/hwpx.md (python-hwpx [pure Python, in-process], form filling 3-tier fallback [fill_by_path→`{{}}`→free text] = main, validation [HwpxDocument.validate() XSD + package-validation CLI], math = unsupported [v2, silently dropped on read], `.hwp` = normalization gate only, soffice hwpx render UNVERIFIED, import not measured on this machine)
+- no-reference fallback → references/themes/ (10 font/color presets — only when standardize was skipped for lack of reference documents; an induced style spec always wins over a preset)
 </Format_Knowledge>
 
 <Steps>

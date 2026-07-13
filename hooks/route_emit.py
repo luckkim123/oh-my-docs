@@ -22,6 +22,7 @@ CHECKPOINT = (
     "<omd-routing>\n"
     "문서 작업 요청(.pptx/.docx/.xlsx/.hwpx 생성·수정·검토·양식추출)이면, 행동 전에 한 줄로 판정하라:\n"
     "- 포맷: pptx / docx / xlsx / hwpx — references/formats/<format>.md 카드가 도구·함정·수식의 단일 진실.\n"
+    "  (pdf 는 생성 포맷이 아니라 입력·변환 층위 — 입력=docs-pdf, 변환 타깃=docs-convert. FORMAT 판정에 pdf 를 넣지 말 것.)\n"
     "- 단계: intake(의중) / standardize(양식추출) / plan(구조) / build(산출) / "
     "inspect(형성적 검토) / verify(총괄 검증) / revise(통과까지 루프), 또는 docs-pilot(통째).\n"
     "- 메타 단계: learn(관찰→style-spec 기본값 승격, 사람 게이트) — 운영 중 .omd/learned.md 에 쌓인 "

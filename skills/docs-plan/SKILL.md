@@ -49,7 +49,7 @@ this is where rearranging is cheapest. After approval, build. (For `--consensus`
 > ② (Important) analyzer → planner → [planner architect responsibility] → inspector MUST be sequential. Await each stage's result.
 > ③ (CRITICAL) Sequencing is guaranteed only by the controller's await (no runtime lock). Concurrent dispatch amplifies arc inconsistency.
 1c. **analyzer** dispatch (when the inventory needs reinforcement; reuse the existing one if sufficient). Next step *only after* it finishes.
-2c. **planner** dispatch (`--consensus` directive): triggers `<Consensus_RALPLAN_DR_Protocol>` — Principles + Drivers + arc Options≥2 + steelman + tradeoff + ADR + (if Deliberate) pre-mortem. Output = `plan.md` + outline.
+2c. **planner** dispatch (`--consensus` directive): triggers `<Consensus_RALPLAN_DR_Protocol>` — Principles + Drivers + arc Options≥2 + steelman + tradeoff + ADR + (if Deliberate) pre-mortem. Output = `plan.md` + outline. Dispatch this Task with `model: opus` — Deliberate consensus is the one planner path that warrants opus; the default `--direct` path runs at the agent's frontmatter sonnet.
 3c. **[planner architect responsibility]**: not a separate agent — the planner already performs this via steelman/antithesis (T1: doc-architect is not newly created).
 4c. **inspector** dispatch (`doc-inspector`): formative critique of plan.md + outline (4 critic techniques, severity). Does not issue PASS/FAIL.
 5c. **re-review loop**: if the inspector raises critical/important, re-delegate to the planner (back to 2c), then re-critique. Max 5 rounds. On reaching 5, present the best plus "consensus not reached — remaining findings."

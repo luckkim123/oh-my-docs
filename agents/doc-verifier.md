@@ -48,6 +48,7 @@ disallowedTools: Write, Edit, NotebookEdit
     5) Check `.omd/<slug>/versions/` count against the snapshot threshold.
     6) Capture the snapshot identifier: mtime or CRC of `outputs/<slug>/current.<ext>` (`stat -f %m` / `stat -c %Y`, or `unzip -t` CRC line), together with the blocker IDs addressed this round.
     7) Issue PASS / FAIL with the evidence table, including the snapshot identifier.
+    8) Engine-version pin check (G7): measure the live engine version and compare with the card's `## Engine` pins (contract: references/formats/README.md). On mismatch, record `UNVERIFIED (engine drift)` in the Verification Report and re-verify affected claims fresh instead of trusting the card's stamps.
   </Investigation_Protocol>
 
   <Tool_Usage>

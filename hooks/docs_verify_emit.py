@@ -1,5 +1,5 @@
 """OMD PostToolUse hook: when a Bash command builds/converts a document artifact
-(.pptx/.docx/.hwpx via python-pptx / python-docx / soffice), inject a
+(.pptx/.docx/.xlsx/.hwpx via python-pptx / python-docx / openpyxl / soffice), inject a
 document-integrity reminder (stdlib only, fail-open).
 
 Why Bash (not Edit|Write): OMD does not edit .pptx/.docx in place — those are
@@ -18,16 +18,20 @@ Noise control: most Bash commands are not document builds, so the hook stays
 SILENT unless a build/convert signal AND a document extension both appear. A
 read-only render (pdftoppm) or integrity check (unzip -t) alone does not trigger
 it. Fail-open: any error returns 0 so the session is never blocked."""
+import hashlib
 import json
+import os
 import re
 import sys
+import tempfile
+import time
 
-DOC_EXTS = (".pptx", ".docx", ".hwpx")
 # Build/convert signals — generation, not read-only inspection. These name the
 # engine/convert explicitly, so they fire on their own (an extension confirms intent).
 BUILD_SIGNALS = (
     "python-pptx", "python-docx", "from pptx", "import pptx",
     "from docx", "import docx", "Presentation(", "Document(",
+    "openpyxl", "xlsxwriter", "Workbook(",
     "soffice --convert", "libreoffice --convert", "--convert-to",
 )
 # Builder's recommended path is "Write a build script, then run `python3 build.py`"
@@ -37,9 +41,57 @@ BUILD_SIGNALS = (
 # run whose name hints at document building (build/deck/slide/doc/pptx/docx/hwpx),
 # so an unrelated `python3 analyze_runs.py` does NOT trigger (noise control).
 RUN_SCRIPT_RE = re.compile(
-    r"\bpython3?\b[^\n|&;]*\b\w*(build|deck|slide|doc|pptx|docx|hwpx|present)\w*\.py\b",
+    r"\bpython3?\b[^\n|&;]*\b\w*(build|deck|slide|doc|pptx|docx|xlsx|hwpx|present)\w*\.py\b",
     re.IGNORECASE,
 )
+
+# G1: verify-pending sentinel handshake — armed on build, cleared on a
+# verify-signal command, enforced (advisory) by hooks/docs_stop_guard.py at Stop.
+VERIFY_SIGNALS = ("pdftoppm", "unzip -t")
+SLUG_RE = re.compile(r"(?:\.omd|outputs)/([^/\s'\"]+)/")
+SENTINEL = ".verify-pending"
+
+# HG-3: same-content reminder cooldown — silences repeat message noise only;
+# sentinel arm (G1 state) always happens regardless of throttling.
+THROTTLE_FILE = ".hook-throttle.json"
+DEFAULT_COOLDOWN = 600.0
+
+
+def _omd_root(payload):
+    return os.path.join(payload.get("cwd") or os.getcwd(), ".omd")
+
+
+def _sentinel_path(root, command):
+    m = SLUG_RE.search(command)
+    return os.path.join(root, m.group(1), SENTINEL) if m else os.path.join(root, SENTINEL)
+
+
+def arm_sentinel(root, command):
+    """Atomic write (ST-1): half-written sentinels must never exist."""
+    path = _sentinel_path(root, command)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    body = json.dumps({"armed_at": time.time(), "command_head": command[:80]})
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".tmp-verify-")
+    with os.fdopen(fd, "w") as f:
+        f.write(body)
+    os.replace(tmp, path)
+
+
+def clear_sentinels(root, command):
+    # ponytail: clearing heuristic is command-string sniffing; upgrade to explicit
+    # verify-stage signaling if false-clears surface
+    if not os.path.isdir(root):
+        return  # defensive: callable safely outside main()'s try envelope
+    m = SLUG_RE.search(command)
+    targets = ([os.path.join(root, m.group(1), SENTINEL)] if m
+               else [os.path.join(root, SENTINEL)]
+               + [os.path.join(root, d, SENTINEL) for d in os.listdir(root)
+                  if os.path.isdir(os.path.join(root, d))])
+    for t in targets:
+        try:
+            os.remove(t)
+        except OSError:
+            pass
 
 
 def is_doc_build(command: str) -> bool:
@@ -67,8 +119,43 @@ def build_reminder() -> str:
         "+ 전수 정독을 확인할 것. 형성적 개선점은 docs-inspect.\n"
         "- ⚠️ '열리는 것 같다'는 검증이 아니다 — fresh 렌더 증거 없이 done 선언 금지. "
         "원본 in-place 수정 금지(최종본은 outputs/<slug>/current 하나, 버전 스냅샷은 .omd/<slug>/versions/).\n"
-        "- pptx/docx/hwpx 포맷 원형 유지(임의 변환 금지). 수식은 카드가 VERIFIED 표시한 경로만."
+        "- pptx/docx/xlsx/hwpx 포맷 원형 유지(임의 변환 금지). 수식은 카드가 VERIFIED 표시한 경로만."
     )
+
+
+def _cooldown_seconds():
+    try:
+        return float(os.environ.get("OMD_REMINDER_COOLDOWN_SECONDS", DEFAULT_COOLDOWN))
+    except ValueError:
+        return DEFAULT_COOLDOWN
+
+
+def reminder_throttled(root: str, message: str) -> bool:
+    """True → suppress this reminder (same content within cooldown). Fail-open: any
+    IO/JSON error answers False (fire the reminder — silence is the risky side)."""
+    cooldown = _cooldown_seconds()
+    if cooldown <= 0:
+        return False
+    path = os.path.join(root, THROTTLE_FILE)
+    digest = hashlib.sha256(message.encode("utf-8")).hexdigest()
+    now = time.time()
+    try:
+        with open(path, encoding="utf-8") as f:
+            seen = json.load(f)
+    except Exception:
+        seen = {}
+    throttled = isinstance(seen, dict) and now - float(seen.get(digest, 0) or 0) < cooldown
+    if not throttled:
+        try:
+            seen = seen if isinstance(seen, dict) else {}
+            seen[digest] = now
+            fd, tmp = tempfile.mkstemp(dir=root, prefix=".tmp-throttle-")
+            with os.fdopen(fd, "w") as f:
+                json.dump(seen, f)
+            os.replace(tmp, path)
+        except Exception:
+            pass  # recording failure must not suppress the reminder
+    return throttled
 
 
 def main() -> int:
@@ -83,11 +170,28 @@ def main() -> int:
 
     # 문서 산출/변환 명령일 때만 리마인더. 그 외 Bash 는 침묵.
     if not is_doc_build(command):
+        try:
+            if any(sig in command for sig in VERIFY_SIGNALS):
+                clear_sentinels(_omd_root(payload), command)
+        except Exception:
+            pass
         return 0
+
+    try:
+        arm_sentinel(_omd_root(payload), command)
+    except Exception:
+        pass  # fail-open: sentinel is best-effort, reminder still fires
+
+    reminder = build_reminder()
+    try:
+        if reminder_throttled(_omd_root(payload), reminder):
+            return 0
+    except Exception:
+        pass  # fail-open: on any doubt, fire the reminder
 
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PostToolUse",
-        "additionalContext": build_reminder(),
+        "additionalContext": reminder,
     }}))
     return 0
 

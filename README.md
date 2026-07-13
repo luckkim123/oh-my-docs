@@ -12,13 +12,17 @@ runs without omha.
 ## Structure (stage-centric)
 
 ```
-skills/   docs-intake · docs-standardize · docs-plan · docs-build · docs-inspect · docs-verify · docs-pilot
+skills/   docs-intake · docs-standardize · docs-plan · docs-build · docs-inspect · docs-verify
+          docs-convert · docs-revise · docs-translate · docs-pilot · docs-learn · docs-pdf
 agents/   doc-analyzer · doc-planner · doc-builder · doc-inspector · doc-verifier   (OMC XML 7-section)
-references/formats/{pptx,docx,hwpx}.md   format tools/traps/formula knowledge (single source of truth)
-references/rubrics/ppteval.md            Content/Design/Coherence (inspect + verify)
-hooks/route_emit.py                      UserPromptSubmit format/stage routing checkpoint (stdlib only)
-hooks/docs_verify_emit.py                PostToolUse — after a Bash document build/convert, a
-                                         freeze-safe docs-verify reminder (stdlib only, fail-open)
+references/formats/{pptx,docx,xlsx,hwpx}.md   format tools/traps/formula knowledge (single source of truth)
+references/formats/pdf.md                     pdf as *input/convert layer* (not a generation format)
+references/rubrics/ppteval.md                 Content/Design/Coherence (inspect + verify)
+references/themes/                            10 fallback font/color presets (no-reference branch)
+references/wiki/README.md                     two-level wiki contract (local + global ascent)
+hooks/route_emit.py                           UserPromptSubmit format/stage routing checkpoint (stdlib only)
+hooks/docs_verify_emit.py                     PostToolUse — after a Bash document build/convert, a
+                                              freeze-safe docs-verify reminder (stdlib only, fail-open)
 ```
 
 Skills are thin scores; agents are the brains they dispatch (`Task(subagent_type="oh-my-docs:doc-*")`).
@@ -28,14 +32,19 @@ Role NOT-responsible for authoring). Agents that hit uncovered SDK behavior cons
 (`<External_Consultation>`: format card → Context7 → official docs) rather than guessing.
 `docs-pilot` orchestrates the full brief→document flow with a user gate at each step.
 
-## Status (2026-05-31)
+## Status (2026-07-13)
 
-MVP: **pptx pilot**. Skills, agents, format cards, and routing hook are implemented and structurally
-verified. Format cards: **pptx, docx, xlsx complete; hwpx stub**. Formula rendering proven by real
-soffice renders: **docx** native OMML path VERIFIED (editable math, with two documented soffice
-caveats — `\hat` accent, `\sum`/`\,` tofu box) plus matplotlib-image fallback; **pptx** is
-matplotlib-image only (soffice/Impress renders native OMML blank). The docx/xlsx build paths follow
-their cards but are piloted after pptx is validated end-to-end in a live session.
+**v0.1.0 (R1 — hygiene + core gates).** All four office format cards are complete
+(**pptx, docx, xlsx, hwpx**), plus a pdf *input-side* card (`docs-pdf` skill) and a two-level
+wiki (local + global ascent). 12 skills · 5 agents · hooks with regression tests
+(`python3 -m pytest tests/`). Formula rendering proven by real soffice renders: **docx** native
+OMML path VERIFIED (editable math, with two documented soffice caveats — `\hat` accent,
+`\sum`/`\,` tofu box) plus matplotlib-image fallback; **pptx** is matplotlib-image only
+(soffice/Impress renders native OMML blank). The pptx path is validated end-to-end in live
+sessions; docx/xlsx/hwpx build paths follow their cards.
+
+Roadmap: R1 hygiene+gates (this release) → R2 repo-docs genre → R3 MkDocs site genre →
+R4 knowledge lifecycle — see `docs/superpowers/specs/2026-07-11-omd-program-design.md`.
 
 Design: the stage-centric redesign decision doc (maintained in the author's planning notes, outside this repo).
 
