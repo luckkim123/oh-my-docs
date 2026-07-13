@@ -83,6 +83,16 @@ class TestSafeWikiPath(unittest.TestCase):
             with self.assertRaises(ValueError, msg=f"{cat!r}/{name!r}"):
                 qh.safe_wiki_path("/tmp/omd-wiki-root", cat, name)
 
+    def test_rejects_symlinked_category_escaping_root(self):
+        """Layer-2 (realpath/commonpath) coverage: a lexically clean category that is a
+        symlink resolving OUTSIDE the wiki root must be rejected by the resolve-prefix
+        re-check — the lexical loop cannot catch this shape."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as outside:
+            os.symlink(outside, os.path.join(root, "linked-cat"))
+            with self.assertRaises(ValueError):
+                qh.safe_wiki_path(root, "linked-cat", "note.md")
+
 
 class TestTitleToSlug(unittest.TestCase):
     def test_english_keywords(self):
