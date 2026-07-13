@@ -1,0 +1,28 @@
+site_name: oh-my-docs
+site_description: Document-work orchestration harness for Claude Code
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+    absolute_links: warn
+  links:
+    not_found: warn
+    anchors: warn
+    unrecognized_links: warn
+nav:
+  - Home: index.md
+  - Tutorials:
+      - Getting started: tutorials/getting-started.md
+  - How-to:
+      - Produce and verify a document: how-to/produce-and-verify.md
+  - Reference:
+      - Skills and agents: reference/skills-and-agents.md
+      - Format cards: reference/format-cards.md
+  - Explanation:
+      - Design principles: explanation/design-principles.md
