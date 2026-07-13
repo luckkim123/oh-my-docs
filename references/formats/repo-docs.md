@@ -11,7 +11,7 @@
 | Tool | Role | Version (measured) | Status |
 |:---|:---|:---|:---|
 | Markdown (CommonMark/GFM) | the format itself | n/a | no engine to install |
-| markdownlint-cli2 (via `npx`) | gate ③ lint | — | UNVERIFIED (not yet measured on this machine) |
+| markdownlint-cli2 (via `npx`) | gate ③ lint | v0.23.0 (markdownlint v0.41.0) | VERIFIED ✓ — 2026-07-13, markdownlint-cli2 v0.23.0 |
 | lychee | external-link check (optional item) | — | UNVERIFIED — optional; network-dependent, excluded from the default gate |
 | python3 stdlib | section-order / date / placeholder checks | measured at dogfooding | see `tests/test_repo_docs_dogfood.py` |
 

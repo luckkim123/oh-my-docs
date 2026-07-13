@@ -10,6 +10,8 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 > superseded by the R1–R4 release train (spec: `docs/superpowers/specs/2026-07-11-omd-program-design.md` §5).
 > Entries below predating v0.1.0 were written under the old policy and stay as-is;
 > the git log remains the SSOT for pre-semver general content changes.
+> **R2 (2026-07-13)**: pre-semver entries were consolidated verbatim under the "Historical" tail
+> section below — superseding R1's keep-in-place note; content unchanged.
 
 ## [Unreleased]
 
@@ -54,6 +56,8 @@ R1 "hygiene + core gates" — first semver release (release train: spec
 - `docs_verify_emit`: dead `DOC_EXTS` constant removed; xlsx engine signals
   (openpyxl/xlsxwriter/Workbook() + xlsx-named scripts) now trigger the reminder (H4).
 - `references/themes/` fallback presets wired into docs-build / docs-standardize (H7).
+
+## Historical — pre-semver (commit-SHA era)
 
 ### Added
 - **Build-time format-regression defense — pptx card API traps + post-build shape-assertion gate + standardize enforcement**
