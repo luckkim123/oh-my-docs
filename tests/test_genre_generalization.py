@@ -79,6 +79,12 @@ def test_intake_genre_frames_from_card():
     assert "defense/conference/lecture" in body  # 오피스 사례 보존
 
 
+def test_intake_names_site_frame():
+    body = _skill("docs-intake")
+    assert "Diátaxis" in body                # site 의 장르 프레임
+    assert "repo-docs, site" in body         # 세트 스코프 게이트가 site 도 커버
+
+
 def test_plan_structure_frame_from_card():
     body = _skill("docs-plan")
     assert "structure frame" in body
@@ -104,6 +110,12 @@ def test_analyzer_has_input_boundary_and_genre_frame():
     assert "Input boundary" in body          # AC-3 화이트리스트
     assert "never read the whole codebase" in body
     assert "genre frame" in body
+
+
+def test_analyzer_genre_frame_covers_site():
+    body = _agent("doc-analyzer")
+    assert "Diátaxis" in body
+    assert "mkdocs.yml" in body              # site 입력 화이트리스트의 구체물
 
 
 # ── T11: 소형 묶음 (§4.4-10~13) ───────────────────────────────────────
