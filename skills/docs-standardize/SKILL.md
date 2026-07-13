@@ -21,17 +21,16 @@ Analyze several existing documents to inductively extract the *common* standard 
 </Use_When>
 
 <Do_Not_Use_When>
-- When there is **no** existing document to reference at all → skip (build uses the default tone preset — the concrete fallback is `references/themes/` (10 font/color presets); offer those instead of guessing)
+- When there is **no** existing document to reference at all → skip (build uses the card's no-reference fallback — office formats: `references/themes/` 10 font/color presets; text genres never use themes/ — repo-docs falls back to the card's genre section presets, site to the mkdocs-material palette schema (F8))
 - When analyzing just a single document/page is enough → use doc-analyzer directly (no induction needed)
 </Do_Not_Use_When>
 
 <Mandatory_When>
-**⚠️ When a template/sample is supplied, this stage is NON-SKIPPABLE (mandatory).** If the user provides a master template (a .pptx etc. with real layouts) or a sample to follow, you MUST, before build, extract that template's **layout/placeholder map** (layout index and name; each placeholder's idx, type, inherited font, and number style) and hand it to the builder. Do this even for a single template (N=1 to induce) — this is not "inducing a common standard" but "the layout blueprint the builder will clone", so it is needed even at N=1. This map is the data `references/formats/pptx.md` "Building on a master template" presupposes. Going straight to build without the map → the builder hand-draws on blank slides → the template is wholesale ignored (2026-06-16 v1–v3).
+**⚠️ When a template/sample is supplied, this stage is NON-SKIPPABLE (mandatory).** (The mechanics below describe render-capable office formats; for text genres the extracted "map" is the card's standard-convention checklist — section order, voice, badge/changelog conventions — induced from the supplied sample, no PNG round-trip since there is no page to render.) If the user provides a master template (a .pptx etc. with real layouts) or a sample to follow, you MUST, before build, extract that template's **layout/placeholder map** (layout index and name; each placeholder's idx, type, inherited font, and number style) and hand it to the builder. Do this even for a single template (N=1 to induce) — this is not "inducing a common standard" but "the layout blueprint the builder will clone", so it is needed even at N=1. This map is the data `references/formats/pptx.md` "Building on a master template" presupposes. Going straight to build without the map → the builder hand-draws on blank slides → the template is wholesale ignored (2026-06-16 v1–v3).
 </Mandatory_When>
 
 <Gate>
-**Gate — extraction scope + round-trip.** Confirm which documents count as the standard population → after extraction,
-regenerate one representative page → compare PNGs against the original at ≥85% match. If below, reinforce the spec.
+**Gate — extraction scope + fidelity check (format-conditional).** Confirm which documents count as the standard population → after extraction: render-capable office formats regenerate one representative page and compare PNGs against the original at ≥85% match (below → reinforce the spec); text genres verify the extracted spec against the card's standard-convention checklist — every extracted rule maps to a card convention item or is flagged house-specific (F6/PS-2 — the D3 frame reused, no new metric invented).
 </Gate>
 
 <Steps>
@@ -39,7 +38,7 @@ regenerate one representative page → compare PNGs against the original at ≥8
 2. Dispatch doc-analyzer to each document, extracting each one's design system:
    `Task(subagent_type="oh-my-docs:doc-analyzer", ...)`
 3. Induce the **common denominator** (fonts/colors/margins/layouts recurring across multiple documents) from the extraction results → style spec.
-4. Round-trip verification: regenerate one representative page from the spec → compare against the original. If <85%, reinforce the spec.
+4. Fidelity check per the Gate above — render-capable office formats: regenerate one representative page → compare PNGs against the original (≥85%; if below, reinforce the spec); text genres: cross-check the extracted spec against the card's standard-convention checklist.
 5. Present the style spec as the gate → confirm.
 </Steps>
 

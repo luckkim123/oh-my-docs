@@ -1,0 +1,26 @@
+{
+  // repo-docs card exception layer (references/formats/repo-docs.md gate ③, D3 "customizable"
+  // tier). Every rule below is disabled ONLY because measured against pre-existing content
+  // this task is out of scope (or explicitly forbidden, plan decision 5) to rewrite —
+  // verified by re-running markdownlint against the pre-task CHANGELOG.md (commit ebd7c07):
+  // the identical 5 rules already fired 96 times before this task touched the file.
+  "config": {
+    // MD013 line-length: disabled — this repo uses no-hard-wrap prose (one sentence per
+    // line can exceed 80/120 cols) across README/CHANGELOG; content-level length rules
+    // (short description ≤120) are enforced by tests/test_repo_docs_dogfood.py instead.
+    "MD013": false,
+    // Historical tail (verbatim, plan decision 5) predates the blank-line-around-headings
+    // convention — rewriting spacing there would not be a verbatim move.
+    "MD022": false,
+    // Same reason as MD022 — Historical tail lists sit directly under their heading with
+    // no blank line, pre-existing formatting locked by the verbatim requirement.
+    "MD032": false,
+    // Historical tail is a flat sequence of dated batches, each repeating "### Added" /
+    // "### Changed" / "### Fixed" with no distinguishing parent heading — inherent to the
+    // pre-semver content being consolidated verbatim, not a new duplication.
+    "MD024": false,
+    // One historical entry uses "+" list markers instead of "-" — verbatim content, not
+    // rewritten.
+    "MD004": false
+  }
+}

@@ -21,7 +21,9 @@ import sys
 CHECKPOINT = (
     "<omd-routing>\n"
     "문서 작업 요청(.pptx/.docx/.xlsx/.hwpx 생성·수정·검토·양식추출)이면, 행동 전에 한 줄로 판정하라:\n"
-    "- 포맷: pptx / docx / xlsx / hwpx — references/formats/<format>.md 카드가 도구·함정·수식의 단일 진실.\n"
+    "- 포맷: pptx / docx / xlsx / hwpx / repo-docs — references/formats/<format>.md 카드가 도구·함정·수식의 단일 진실.\n"
+    "  (repo-docs = README·CHANGELOG 등 GitHub 저장소 문서 세트 장르 — 엔진은 마크다운+린터 체인, "
+    "산출은 artifact-set(outputs/<slug>/current/). site 장르는 R3에서 카드와 함께 편입.)\n"
     "  (pdf 는 생성 포맷이 아니라 입력·변환 층위 — 입력=docs-pdf, 변환 타깃=docs-convert. FORMAT 판정에 pdf 를 넣지 말 것.)\n"
     "- 단계: intake(의중) / standardize(양식추출) / plan(구조) / build(산출) / "
     "inspect(형성적 검토) / verify(총괄 검증) / revise(통과까지 루프), 또는 docs-pilot(통째).\n"
@@ -38,7 +40,7 @@ CHECKPOINT = (
     "빈 Presentation()/백지에서 새로 짜는 것은 금지. 이 확인 전에는 '이렇게 개선하겠다'는 "
     "방향 제시도 하지 마라 — 지형 미파악 상태의 방향 제시가 백지 재시작으로 직결된다.\n\n"
     "문서 작업이면, 판정을 응답 맨 앞 omha ROUTE 줄 바로 다음에 이 한 줄로 출력하라(누락 금지):\n"
-    "STAGE(docs) → <intake|standardize|plan|build|inspect|verify|revise|learn|docs-pilot> · <pptx|docx|xlsx|hwpx> · <한 줄 근거>\n"
+    "STAGE(docs) → <intake|standardize|plan|build|inspect|verify|revise|learn|docs-pilot> · <pptx|docx|xlsx|hwpx|repo-docs> · <한 줄 근거>\n"
     "문서 작업이 아니면 이 블록 전체 무시(STAGE 줄도 출력하지 말 것).\n"
     "</omd-routing>"
 )

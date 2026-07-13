@@ -1,12 +1,15 @@
 """OMD PostToolUse hook: when a Bash command builds/converts a document artifact
 (.pptx/.docx/.xlsx/.hwpx via python-pptx / python-docx / openpyxl / soffice), inject a
 document-integrity reminder (stdlib only, fail-open).
+R2 (D5): md-genre deliverables are text born via Edit|Write — a second trigger
+watches those, scoped to outputs/ paths with slug context.
 
 Why Bash (not Edit|Write): OMD does not edit .pptx/.docx in place — those are
 binary. doc-builder WRITES a python build script and RUNS it with Bash to
 produce the artifact (or runs `soffice --convert-to`). So the document is born
 from a Bash command, and that is what this hook watches. (oms watches Edit|Write
 because .tex/.bib are text edited directly — different domain, different trigger.)
+(Office formats only — see the D5 note above for md genres.)
 
 This is the freeze-safe variant of OMC's post-tool-verifier. OMC injects "fix
 before continuing" on write — a phrasing observed to freeze the model (reads as
@@ -38,7 +41,7 @@ BUILD_SIGNALS = (
 # (doc-builder Tool_Usage). Such a command may name NEITHER an engine string NOR a
 # .pptx inline — so the signal+ext pair above misses it, and the hook stays silent
 # on the exact path the harness tells the builder to use. Catch a python script
-# run whose name hints at document building (build/deck/slide/doc/pptx/docx/hwpx),
+# run whose name hints at document building (build/deck/slide/doc/pptx/docx/xlsx/hwpx/present),
 # so an unrelated `python3 analyze_runs.py` does NOT trigger (noise control).
 RUN_SCRIPT_RE = re.compile(
     r"\bpython3?\b[^\n|&;]*\b\w*(build|deck|slide|doc|pptx|docx|xlsx|hwpx|present)\w*\.py\b",
@@ -47,9 +50,27 @@ RUN_SCRIPT_RE = re.compile(
 
 # G1: verify-pending sentinel handshake — armed on build, cleared on a
 # verify-signal command, enforced (advisory) by hooks/docs_stop_guard.py at Stop.
-VERIFY_SIGNALS = ("pdftoppm", "unzip -t")
+VERIFY_SIGNALS = ("pdftoppm", "unzip -t", "markdownlint")
 SLUG_RE = re.compile(r"(?:\.omd|outputs)/([^/\s'\"]+)/")
 SENTINEL = ".verify-pending"
+
+# D5 (R2): md-genre artifacts (repo-docs, site) are text — born via Edit|Write,
+# not Bash. Trigger is narrowed to deliverable paths (outputs/<slug>/**/*.md)
+# WITH slug context (.omd/<slug>/ exists) so ordinary md editing stays silent
+# (spec §7 risk ②). Work-area md (.omd/<slug>/build-notes.md, consensus/*.md)
+# is not a deliverable and never arms (§7 ⑥ alert fatigue).
+MD_EXTS = (".md", ".markdown")
+
+
+def slug_from_md_path(file_path):
+    """First path segment after an `outputs/` component (HK-3). Textual, so it
+    handles absolute and relative paths, single-file (outputs/<slug>/current.md),
+    artifact-set members and nested site trees identically."""
+    parts = [p for p in os.path.normpath(file_path).split(os.sep) if p]
+    for i, part in enumerate(parts[:-1]):
+        if part == "outputs":
+            return parts[i + 1]
+    return None
 
 # HG-3: same-content reminder cooldown — silences repeat message noise only;
 # sentinel arm (G1 state) always happens regardless of throttling.
@@ -66,15 +87,18 @@ def _sentinel_path(root, command):
     return os.path.join(root, m.group(1), SENTINEL) if m else os.path.join(root, SENTINEL)
 
 
-def arm_sentinel(root, command):
+def _write_sentinel(path, head):
     """Atomic write (ST-1): half-written sentinels must never exist."""
-    path = _sentinel_path(root, command)
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    body = json.dumps({"armed_at": time.time(), "command_head": command[:80]})
+    body = json.dumps({"armed_at": time.time(), "command_head": head[:80]})
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".tmp-verify-")
     with os.fdopen(fd, "w") as f:
         f.write(body)
     os.replace(tmp, path)
+
+
+def arm_sentinel(root, command):
+    _write_sentinel(_sentinel_path(root, command), command)
 
 
 def clear_sentinels(root, command):
@@ -123,6 +147,42 @@ def build_reminder() -> str:
     )
 
 
+def md_reminder(slug: str) -> str:
+    return (
+        "[OMD document-integrity reminder] 텍스트 산출물(.md) 편집 감지 (slug: %s).\n"
+        "- 편집을 마치면 docs-verify 로 카드가 정의한 **verify gate** 를 실행할 것 — "
+        "repo-docs 는 references/formats/repo-docs.md 의 gate(필수 섹션·순서 / 내부 링크 / "
+        "markdownlint / 코드블록 언어 태그 / ISO 날짜·버전 역순 / placeholder 스캔).\n"
+        "- ⚠️ fresh 실행 증거 없이 done 선언 금지 — '읽어보니 괜찮다'는 검증이 아니다.\n"
+        "- 다중 파일 산출물의 계약은 outputs/<slug>/current/ + .omd/<slug>/manifest.json "
+        "(references/output-layout.md)." % slug
+    )
+
+
+def handle_md_edit(payload) -> int:
+    try:
+        file_path = (payload.get("tool_input", {}) or {}).get("file_path", "") or ""
+        if not file_path.lower().endswith(MD_EXTS):
+            return 0
+        slug = slug_from_md_path(file_path)
+        if not slug:
+            return 0
+        root = _omd_root(payload)
+        if not os.path.isdir(os.path.join(root, slug)):
+            return 0  # no slug context → not an omd pipeline artifact (noise control)
+        _write_sentinel(os.path.join(root, slug, SENTINEL), "edit:" + file_path)
+        reminder = md_reminder(slug)
+        if reminder_throttled(root, reminder):
+            return 0
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": reminder,
+        }}))
+        return 0
+    except Exception:
+        return 0  # fail-open
+
+
 def _cooldown_seconds():
     try:
         return float(os.environ.get("OMD_REMINDER_COOLDOWN_SECONDS", DEFAULT_COOLDOWN))
@@ -164,7 +224,13 @@ def main() -> int:
     except Exception:
         return 0  # fail-open: 입력 파싱 실패해도 세션 막지 않음
 
-    if payload.get("tool_name", "") != "Bash":
+    if not isinstance(payload, dict):
+        return 0  # fail-open: valid JSON but not an object
+
+    tool = payload.get("tool_name", "")
+    if tool in ("Edit", "Write"):
+        return handle_md_edit(payload)
+    if tool != "Bash":
         return 0
     command = (payload.get("tool_input", {}) or {}).get("command", "")
 

@@ -326,7 +326,14 @@ A `wiki/` note MUST NOT be treated as an enforceable default. Escalate to `learn
 omd learns **form, never content**. A `candidate_default.target` naming a document's *content*
 (specific text, a claim, a number, a source) is **rejected** — only form/style/layout targets
 are allowed. And learning never licenses distorting a source document's facts/numbers/claims
-(the content-preservation guardrail omd's translate/convert stages already enforce). Form
+(the content-preservation guardrail omd's translate/convert stages already enforce). 
+
+Text-genre boundary examples (D7 — the form/content line is blurrier than in office decks, so
+name it): learnable FORM — README section-order preference, voice, badge style, changelog
+grouping convention, nav-structure pattern. Forbidden CONTENT — project facts, API names,
+version numbers, link targets.
+
+Form
 specializes; content is preserved verbatim. This is omd's load-bearing invariant — the
 analogue of oms's citation-safety.
 

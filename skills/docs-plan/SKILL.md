@@ -10,7 +10,7 @@ description: |
 # docs-plan — Structure Design (stage 3)
 
 <Purpose>
-Turn the analyzer inventory into a concrete document structure: narrative arc + per-slide/section purpose, key message, and required assets. Lock the structure before producing anything so direction is approved at the *cheapest moment* (when no artifact exists yet).
+Turn the analyzer inventory into a concrete document structure: the structure frame the card defines (office: narrative arc; repo-docs: genre section preset; site: Diátaxis quadrants) + per-unit purpose, key message, and required assets. Lock the structure before producing anything so direction is approved at the *cheapest moment* (when no artifact exists yet).
 </Purpose>
 
 <Use_When>
@@ -31,7 +31,7 @@ Turn the analyzer inventory into a concrete document structure: narrative arc + 
 </Modes>
 
 <Gate>
-**Gate 1 — Structure lock.** Present the narrative arc + full outline to the user. No artifact exists yet —
+**Gate 1 — Structure lock.** Present the structure frame (narrative arc / section preset / quadrant map) + full outline to the user. No artifact exists yet —
 this is where rearranging is cheapest. After approval, build. (For `--consensus`, present both plan.md + outline.)
 </Gate>
 
@@ -39,7 +39,7 @@ this is where rearranging is cheapest. After approval, build. (For `--consensus`
 ### `--direct` path (default)
 1. Dispatch doc-planner (pass the analyzer inventory + tone preset):
    `Task(subagent_type="oh-my-docs:doc-planner", ...)`
-2. The planner produces the arc selection + a per-slide outline of purpose, message, and assets.
+2. The planner produces the structure-frame selection (arc / section preset / quadrant map, per the card) + a per-unit outline of purpose, message, and assets.
 3. Confirm that all required sections are placed and that the format density limit (references/formats/<format>.md) is respected.
 4. Present the outline as Gate 1 → approval.
 
@@ -57,7 +57,7 @@ this is where rearranging is cheapest. After approval, build. (For `--consensus`
 </Steps>
 
 <Output>
-Narrative arc + per-slide/section {purpose, key message, required assets} outline. The blueprint docs-build will fill in.
+Structure frame (office: narrative arc; repo-docs: section preset; site: quadrant map) + per-unit {purpose, key message, required assets} outline. The blueprint docs-build will fill in.
 **For `--consensus`, additionally**: `plan.md` (decision process — RALPLAN-DR+ADR) + re-review round (N/5) + whether consensus was reached. plan.md and the outline are two separate files (decision process ≠ decision result).
 </Output>
 

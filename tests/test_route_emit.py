@@ -74,12 +74,12 @@ def test_learn_routing_keeps_content_guard():
 
 
 def test_context_lists_formats():
-    """④ 네 포맷(pptx/docx/xlsx/hwpx)이 contract 에 열거돼야 — STAGE 줄에 FORMAT 슬롯.
+    """④ 다섯 포맷(pptx/docx/xlsx/hwpx/repo-docs)이 contract 에 열거돼야 — STAGE 줄에 FORMAT 슬롯.
 
     xlsx 는 references/formats/xlsx.md 카드(openpyxl/xlsxwriter 라우팅, <v>0</v> 함정,
     구조검증 게이트)가 실재하므로 포맷 목록에 포함돼야 한다 (2026-05-31 신설)."""
     out = context_of(run_hook({"prompt": "발표자료"}))
-    for fmt in ("pptx", "docx", "xlsx", "hwpx"):
+    for fmt in ("pptx", "docx", "xlsx", "hwpx", "repo-docs"):
         assert fmt in out, f"format '{fmt}' missing from contract"
 
 
@@ -157,3 +157,17 @@ def test_ssot_gate_forbids_direction_before_recon():
     out = context_of(run_hook({"prompt": "이 슬라이드 이렇게 바꾸자"}))
     assert "방향 제시" in out
     assert "백지" in out  # 지형 미파악 방향 제시 → 백지 재시작
+
+
+def test_repo_docs_in_stage_token_line():
+    """R2: repo-docs 장르가 FORMAT 슬롯(STAGE 토큰 줄)에 광고돼야 — 카드 실재와 동기."""
+    out = context_of(run_hook({"prompt": "README 만들어줘"}))
+    stage_lines = [l for l in out.splitlines() if l.startswith("STAGE(docs)")]
+    assert stage_lines and "repo-docs" in stage_lines[0]
+
+
+def test_site_not_advertised_before_card_exists():
+    """R2 결정 2: site 토큰은 카드가 실재하는 R3에서 — 카드 없는 포맷 광고는 H1 동형 결함."""
+    out = context_of(run_hook({"prompt": "문서 사이트 만들어줘"}))
+    stage_lines = [l for l in out.splitlines() if l.startswith("STAGE(docs)")]
+    assert stage_lines and "site" not in stage_lines[0]

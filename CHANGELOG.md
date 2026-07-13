@@ -10,8 +10,61 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 > superseded by the R1–R4 release train (spec: `docs/superpowers/specs/2026-07-11-omd-program-design.md` §5).
 > Entries below predating v0.1.0 were written under the old policy and stay as-is;
 > the git log remains the SSOT for pre-semver general content changes.
+> **R2 (2026-07-13)**: pre-semver entries were consolidated verbatim under the "Historical" tail
+> section below — superseding R1's keep-in-place note; content unchanged.
 
 ## [Unreleased]
+
+## [0.2.0] - 2026-07-13
+
+R2 "repo-docs genre" — first text genre lands via card-only extension (D1: new format =
+new card, no new skill), consuming the §4.4 infrastructure generalization (spec §5 R2).
+
+### Added
+- **repo-docs genre card** `references/formats/repo-docs.md`: standard-readme /
+  keep-a-changelog / community-health / CODEOWNERS knowledge, genre section presets
+  (library·cli·dataset), intake set-scope gate, analyzer input whitelist (AC-3), and a
+  7-item deterministic verify gate incl. the placeholder scan (PL-3) — external links
+  stay an optional lychee item (network-dependent).
+- **repo-docs rubric** `references/rubrics/repo-docs-rubric.md`: qualitative lenses only
+  (welcoming / information scent / honesty — frame per Treude et al.); mechanical axes
+  live in the card gate (PS-3 dynamic lens composition).
+- **md-genre verify trigger (D5)**: `docs_verify_emit` now watches Edit|Write on
+  `outputs/<slug>/**/*.md` (slug-context gated), arms the same verify-pending sentinel,
+  and `markdownlint` runs clear it; plugin.json registers the Edit|Write matcher.
+- **Artifact-set layout (D4)**: `outputs/<slug>/current/` directory deliverables with
+  `.omd/<slug>/manifest.json` ({path, sha256, role}), directory-wise version snapshots
+  (LC-1), `verify-runs/` engine-log capture (AC-1b), atomic manifest writes (ST-1).
+- **skill-contract guard** `tests/test_skill_contract.py`: every concrete references/
+  path named by skills/agents must exist (AC-4 — H7-class drift regression).
+- **Dogfooding guard** `tests/test_repo_docs_dogfood.py`: omd's own README/CHANGELOG
+  permanently held to the repo-docs mechanical gate.
+
+### Changed
+- **Pipeline generalized to card delegation (§4.4)**: intake/plan skills + planner/
+  analyzer agents consume card-defined genre frames (F7 front-end unblock); builder/
+  verifier pair + inspect/verify/standardize/revise skills delegate gates to the card
+  (F3/F6/PS-1~5); engine-missing verdict standardized as `UNVERIFIED (engine
+  unavailable)` (D3). Office contracts preserved verbatim as the office cards' case.
+- Routing CHECKPOINT advertises `repo-docs` in the FORMAT slot; `site` deliberately
+  deferred to R3 with a pinning test (card-existence rule).
+- `references/themes/` declared office-only (F8); convert/translate explicitly reject
+  artifact-set inputs (LC-3); learning-protocol D7 gains text-genre form/content
+  boundary examples.
+- **README/CHANGELOG regenerated through the new pipeline** (dogfooding acceptance):
+  README now follows the library preset; pre-semver changelog history consolidated
+  verbatim under a `## Historical` tail (supersedes R1's keep-in-place note).
+- `plugin.json author` field documented as intentional attribution metadata — the one
+  sanctioned identifier under the D8 scan (user-ratified via this PR).
+
+> **Verification**: `python3 -m pytest tests/ -q` — 115 passed
+> (R1 baseline 67). markdownlint-cli2 gate run on README/CHANGELOG — exit 0
+> (markdownlint-cli2 v0.23.0), log under
+> `.omd/omd-dogfood/verify-runs/` (uncommitted).
+>
+> **Notes**: MQ-2 (fenced-JSON verify output) deliberately NOT adopted this release —
+> no machine consumer yet; revisit at R3 (plan decision 1). LOCAL ONLY: marketplace
+> update + app restart required after merge (spec §7 ⑤).
 
 ## [0.1.0] - 2026-07-13
 
@@ -54,6 +107,8 @@ R1 "hygiene + core gates" — first semver release (release train: spec
 - `docs_verify_emit`: dead `DOC_EXTS` constant removed; xlsx engine signals
   (openpyxl/xlsxwriter/Workbook() + xlsx-named scripts) now trigger the reminder (H4).
 - `references/themes/` fallback presets wired into docs-build / docs-standardize (H7).
+
+## Historical — pre-semver (commit-SHA era)
 
 ### Added
 - **Build-time format-regression defense — pptx card API traps + post-build shape-assertion gate + standardize enforcement**

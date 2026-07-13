@@ -35,7 +35,8 @@ Per-format tools, pitfalls, math, and version policy are the **single source of 
 - docx → references/formats/docx.md (python-docx, math 2 paths [OMML editable VERIFIED + matplotlib fallback], header/PAGE field/Korean-font pitfalls)
 - xlsx → references/formats/xlsx.md (openpyxl/xlsxwriter routing, `<v>0</v>` formula-cache pitfall, structure-validation gate [not PNG read-through])
 - hwpx → references/formats/hwpx.md (python-hwpx [pure Python, in-process], form filling 3-tier fallback [fill_by_path→`{{}}`→free text] = main, validation [HwpxDocument.validate() XSD + package-validation CLI], math = unsupported [v2, silently dropped on read], `.hwp` = normalization gate only, soffice hwpx render UNVERIFIED, import not measured on this machine)
-- no-reference fallback → references/themes/ (10 font/color presets — only when standardize was skipped for lack of reference documents; an induced style spec always wins over a preset)
+- repo-docs → references/formats/repo-docs.md (GitHub repository document set genre — plain Markdown + borrowed linter chain [markdownlint-cli2 for the lint gate, lychee optional], artifact-set layout [outputs/<slug>/current/ + .omd/<slug>/manifest.json], 7-item deterministic verify gate, no PNG render — fresh-read instead)
+- no-reference fallback → office formats: references/themes/ (10 font/color presets — only when standardize was skipped for lack of reference documents; an induced style spec always wins over a preset). Text genres never fall back to themes/ — their card defines the fallback (repo-docs: genre section presets) (F8)
 </Format_Knowledge>
 
 <Steps>

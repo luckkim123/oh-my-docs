@@ -28,3 +28,40 @@ def test_card_contract_defines_engine_drift_rule():
     contract = (FORMATS_DIR / "README.md").read_text(encoding="utf-8")
     assert "UNVERIFIED (engine drift)" in contract
     assert "## Engine" in contract  # 필수 섹션 계약 명시
+
+
+# ── R2: 장르 카드 계약 (repo-docs) ────────────────────────────────────
+# 장르 카드의 엔진은 선택적 빌린 린터 체인(D3 degrade 보유)이라 GENERATION_CARDS의
+# "핀 없으면 실패" 계약에 불편입(plan 결정 4) — 초기 UNVERIFIED 출발, dogfooding이
+# 실측 가능한 엔진에 스탬프. 대신 필수 3섹션 + gate 완결성을 계약으로 고정.
+GENRE_CARDS = ["repo-docs.md"]
+
+
+def test_genre_cards_carry_required_sections():
+    for name in GENRE_CARDS:
+        text = (FORMATS_DIR / name).read_text(encoding="utf-8")
+        assert re.search(r"^## Engine\b", text, re.MULTILINE), f"{name}: '## Engine' missing"
+        assert "## Hard traps" in text, f"{name}: 'Hard traps' missing"
+        assert "## Version-snapshot policy" in text, f"{name}: snapshot policy missing"
+
+
+def test_repo_docs_gate_is_deterministic_and_complete():
+    text = (FORMATS_DIR / "repo-docs.md").read_text(encoding="utf-8")
+    for token in (
+        "## Verify gate",
+        "placeholder",                        # PL-3 gate ⑦
+        "ISO 8601",                           # gate ⑤
+        "markdownlint",                       # gate ③
+        "UNVERIFIED (engine unavailable)",    # D3 degrade
+        "verify-runs/",                       # AC-1b
+        "manifest",                           # D4/LC-2
+        "McNutt",                             # ladder 1차 출처 (CHI 검증 반영)
+        "License_Note",
+    ):
+        assert token in text, f"repo-docs.md: {token!r} missing"
+
+
+def test_repo_docs_external_links_not_in_default_gate():
+    # spec §7 ③: 외부 링크는 네트워크 의존 — 기본 게이트 제외, lychee 설치 시 선택
+    text = (FORMATS_DIR / "repo-docs.md").read_text(encoding="utf-8")
+    assert "lychee" in text and "optional" in text
