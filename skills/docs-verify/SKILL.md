@@ -26,19 +26,18 @@ Judge, with evidence, whether a completed document clears the bar *as a file* (o
 </Do_Not_Use_When>
 
 <Gate>
-**Gate 3 — final.** Integrity 5/5 + exhaustive read-through + required sections complete → PASS. Any single failure = FAIL.
-4/5 is FAIL (recovery dialog remains).
+**Gate 3 — final.** Every item of the card-defined verify gate passes + required sections complete → PASS. Any single failure = FAIL. Office formats: integrity 5/5 + exhaustive ≥150dpi read-through — 4/5 is FAIL (recovery dialog remains). Text genres (repo-docs): the card's deterministic exit-code chain (section order, links, lint, dates, placeholder scan) + fresh-read. Missing engine → `UNVERIFIED (engine unavailable)` per D3, never a silent PASS.
 </Gate>
 
 <Checks>
-Integrity definition = references/formats/<format>.md, the 3 axes = references/rubrics/ppteval.md.
-zip CRC · engine parsing · soffice conversion · dangling relationships · orphan slideMaster (all 5).
+The gate definition lives in references/formats/<format>.md (single source of truth); the qualitative axes in the format's rubric card (office: references/rubrics/ppteval.md; repo-docs: references/rubrics/repo-docs-rubric.md).
+Office integrity = zip CRC · engine parsing · soffice conversion · dangling relationships · orphan slideMaster (all 5).
 </Checks>
 
 <Steps>
 1. Dispatch doc-verifier (passing the outline + output path):
    `Task(subagent_type="oh-my-docs:doc-verifier", ...)`
-2. The verifier directly runs the 5 integrity checks + ≥150dpi exhaustive read-through + completeness against the outline + versions/ count.
+2. The verifier directly runs the card-defined verify gate (office: the 5 integrity checks + ≥150dpi exhaustive read-through; text genres: the exit-code chain with logs captured to .omd/<slug>/verify-runs/) + completeness against the outline + versions/ count.
 3. **style-spec meta consistency (read-only, H10)** — if `.omd/wiki/convention/lab-style-spec.md` (or `<key>-style-spec.md`) has
    self-specialization meta, check only its integrity: is `specificity` ∈ [0,1] and does it match `(count of origin∈{inductive,learned})/(count of active defaults)`,
    and does every `learned` origin have `learned_refs` provenance (no §6.C silent change)?
