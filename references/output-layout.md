@@ -27,6 +27,12 @@ project root) — never hardcoded to any one machine or absolute path.
 structurally prevents the common failure where the output folder bloats with snapshots and
 intermediates mixed in with the final deliverable.
 
+**Artifact-set generalization (D4)**: single-file formats keep `outputs/<slug>/current.<ext>`
+unchanged. Multi-file genres (repo-docs, site) use a `outputs/<slug>/current/` **directory** as
+the deliverable, paired with `.omd/<slug>/manifest.json`. The invariant is redefined as: *the
+user-visible entry point is exactly one current entry* — one file or one directory, never both,
+never siblings.
+
 ---
 
 ## 1. slug generation (deterministic)
@@ -73,12 +79,16 @@ The confirmed slug is then fixed for the life of the job (never re-asked).
 
 ```
 outputs/<slug>/
-  current.<ext>                       # the one copy the user sees (.pptx/.docx/.hwpx). The PASS copy.
+  current.<ext>                       # single-file formats: the one copy the user sees. The PASS copy.
+  current/                            # artifact-set genres (repo-docs, site): the one deliverable directory
+    README.md  CHANGELOG.md  ...      #   (nested trees allowed — e.g. current/docs/how-to/x.md)
   verify-evidence.md                  # (optional) verification evidence table — for the user
 
 .omd/<slug>/                          # work area — everything the user rarely needs directly
+  manifest.json                       # artifact-set only: {"slug","format","paths":[{"path","sha256","role"}]}
   versions/
-    v{NN}_{YYYY-MM-DD}_{summary}.<ext>   # version copies (§3 rules)
+    v{NN}_{YYYY-MM-DD}_{summary}.<ext>   # single-file version copies (§3 rules)
+    v{NN}_{YYYY-MM-DD}_{summary}/        # artifact-set snapshots: the whole current/ copied (LC-1)
   renders/
     current/                          # latest PNG renders of current.<ext> (inspect/verify, ≥150 dpi)
       slide-{NNN}.png
@@ -89,6 +99,8 @@ outputs/<slug>/
   tmp/
     *                                 # soffice pdf / pdftoppm intermediates — disposable anytime
   build-notes.md                      # (optional) builder notes — for Claude's analysis
+  verify-runs/
+    <engine>-<timestamp>.log          # borrowed-engine stdout+stderr, captured on every run (AC-1b)
 
 .omd/wiki/                            # project-wide accrual — NOT per-job (sibling of <slug>/, carries across sessions)
   convention/  decision/  reference/  # auto-appended defect patterns / style specs / decisions (see references/wiki/README.md)
@@ -136,6 +148,20 @@ Examples:
 `ls` sorts lexically: without padding, `v1, v10, v2` is wrong. With `v01, v02, … v10`, chronological
 order = version number order = sort order, always.
 
+### 3.3 Artifact-set snapshots and the manifest
+
+- Snapshot = copy the **whole** `outputs/<slug>/current/` directory to
+  `.omd/<slug>/versions/v{NN}_{YYYY-MM-DD}_{summary}/` (directory-wise, LC-1). Same "only before
+  a large edit" rule as §3.1.
+- `.omd/<slug>/manifest.json` schema (the builder maintains it; the verifier and the G6 ownership
+  guard consume it): `{"slug": "...", "format": "repo-docs", "paths": [{"path": "README.md",
+  "sha256": "...", "role": "repo-root/README.md"}, ...]}`. `path` is relative to `current/`;
+  `role` records the repo-relative placement target (LC-2) — the card tells the user to `cp -r`
+  preserving relative paths; omd never writes into the user's repo itself.
+- **Atomic write (ST-1)**: write manifest.json to a temp file in the same directory, then
+  `os.replace()` — a half-written manifest reads as "no manifest" and silently disables the
+  ownership guard. Never open+truncate in place.
+
 ---
 
 ## 4. gen-image / render PNG naming
@@ -173,7 +199,7 @@ order = version number order = sort order, always.
 | `.omd/<slug>/renders/` | ✅ all | Claude analysis, regenerable |
 | `.omd/<slug>/gen-image/` | ✅ all | except images the user asks to keep |
 | `.omd/<slug>/tmp/` | ✅ all | build/convert intermediates |
-| `.omd/<slug>/versions/` | ✅ **all but the latest 1 + user-designated milestones** | keep the near-final copy, prune the middle |
+| `.omd/<slug>/versions/` | ✅ **all but the latest 1 + user-designated milestones** | keep the near-final copy, prune the middle (artifact-set: same rule, directory-wise) |
 | `outputs/<slug>/current.<ext>` | ❌ never | user asset — excluded from tally and deletion, mentioned only |
 
 ### 5.3 Safe procedure
@@ -208,3 +234,4 @@ order = version number order = sort order, always.
 - [ ] `.gitignore` excludes `.omd/` and `outputs/*` (keep `outputs/.gitkeep`)
 - [ ] slug rule (§1.1) applied at intake (non-ASCII → ask once for an ASCII slug)
 - [ ] terminal cleanup (§5) goes through AskUserQuestion + trash + excludes `outputs/current.<ext>`
+- [ ] artifact-set genres write manifest.json atomically and snapshot current/ directory-wise
