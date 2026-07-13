@@ -125,6 +125,18 @@ def test_build_knowledge_table_lists_repo_docs():
     assert "repo-docs" in body and "references/formats/repo-docs.md" in body
 
 
+def test_build_knowledge_table_lists_site():
+    body = _skill("docs-build")
+    assert "references/formats/site.md" in body
+    assert "site-build" in body              # built HTML 은 current/ 밖 (결정 4)
+
+
+def test_build_gate_generalized_beyond_png():
+    body = _skill("docs-build")
+    assert "fresh-read" in body              # 텍스트 장르 sanity 증거
+    assert "PNG" in body                     # 오피스 증거는 보존
+
+
 def test_learning_protocol_has_text_genre_boundary():
     text = _ref("learning-protocol.md")
     assert "badge style" in text            # 학습 가능 FORM 예시
