@@ -23,6 +23,7 @@ Convert a finished document into another format or deliverable. .pptx/.docx → 
 <Do_Not_Use_When>
 - If you are *creating* a new document → docs-build
 - If you want to directly *edit/write* a .hwp → not possible (macOS pure-Python limitation). Normalization gate only.
+- artifact-set input (a multi-file `outputs/<slug>/current/` directory) → **explicitly unsupported — say so and stop** (R5+ extension, LC-3; a half-converted set is worse than none)
 </Do_Not_Use_When>
 
 <Conversion_Knowledge>

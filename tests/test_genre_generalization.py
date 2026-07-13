@@ -95,3 +95,28 @@ def test_analyzer_has_input_boundary_and_genre_frame():
     assert "Input boundary" in body          # AC-3 화이트리스트
     assert "never read the whole codebase" in body
     assert "genre frame" in body
+
+
+# ── T11: 소형 묶음 (§4.4-10~13) ───────────────────────────────────────
+
+def test_build_knowledge_table_lists_repo_docs():
+    body = _skill("docs-build")
+    assert "repo-docs" in body and "references/formats/repo-docs.md" in body
+
+
+def test_learning_protocol_has_text_genre_boundary():
+    text = _ref("learning-protocol.md")
+    assert "badge style" in text            # 학습 가능 FORM 예시
+    assert "link targets" in text           # 금지 CONTENT 예시
+
+
+def test_convert_translate_reject_artifact_sets():
+    for name in ("docs-convert", "docs-translate"):
+        body = _skill(name)
+        assert "artifact-set" in body and "unsupported" in body, f"{name}: LC-3 guard missing"
+
+
+def test_themes_declared_office_only():
+    text = _ref("themes/README.md")
+    assert "Office formats only" in text
+    assert "repo-docs" in text              # 텍스트 장르 폴백의 소재지 명시 (F8)

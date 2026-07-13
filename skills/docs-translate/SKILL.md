@@ -21,6 +21,7 @@ Repurpose a finished asset for a different language, tone, or audience (e.g., KO
 <Do_Not_Use_When>
 - If you are *adding/generating* new content → docs-build (translate only moves the expression)
 - If it is a simple format conversion → docs-convert
+- artifact-set input (a multi-file `outputs/<slug>/current/` directory) → **explicitly unsupported — say so and stop** (R5+ extension, LC-3; a half-translated set is worse than none)
 </Do_Not_Use_When>
 
 <Guardrails_Citation_Bound>

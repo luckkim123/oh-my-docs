@@ -7,6 +7,11 @@
 > Borrowed from awesome-claude-skills `theme-factory`, 2026-07-09. License: Apache-2.0
 > (`LICENSE.txt` in this folder). Only the preset **data** (palettes, font pairings, showcase PDF) was
 > ported — the custom-theme-generation logic was intentionally left out (see below).
+>
+> **Office formats only (F8).** These presets are font/color palettes for render-capable
+> office documents. Text genres never fall back here — their no-reference fallback is
+> defined by their format card (repo-docs: genre section presets; site: the
+> mkdocs-material `palette:` schema).
 
 ## When this applies
 
