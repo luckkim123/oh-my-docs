@@ -1,7 +1,7 @@
 ---
 name: doc-planner
 description: Designs document structure, outline, and storyline from the analyzer's inventory. Read-only — produces a plan, not the artifact.
-model: opus
+model: sonnet
 level: 3
 disallowedTools: Write, Edit, NotebookEdit
 ---
