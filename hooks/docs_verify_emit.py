@@ -36,6 +36,7 @@ BUILD_SIGNALS = (
     "from docx", "import docx", "Presentation(", "Document(",
     "openpyxl", "xlsxwriter", "Workbook(",
     "soffice --convert", "libreoffice --convert", "--convert-to",
+    "mkdocs build",   # site genre — plain build arms; a --strict run is a verify (below)
 )
 # Builder's recommended path is "Write a build script, then run `python3 build.py`"
 # (doc-builder Tool_Usage). Such a command may name NEITHER an engine string NOR a
@@ -51,6 +52,17 @@ RUN_SCRIPT_RE = re.compile(
 # G1: verify-pending sentinel handshake — armed on build, cleared on a
 # verify-signal command, enforced (advisory) by hooks/docs_stop_guard.py at Stop.
 VERIFY_SIGNALS = ("pdftoppm", "unzip -t", "markdownlint")
+
+
+def is_verify_run(command: str) -> bool:
+    """Verify-stage runs clear the sentinel and are matched BEFORE build signals:
+    `mkdocs build --strict` is the site card's gate ① (a verify), while a plain
+    `mkdocs build` is a build. Flag order varies, so match the token pair."""
+    if any(sig in command for sig in VERIFY_SIGNALS):
+        return True
+    return "mkdocs" in command and "--strict" in command
+
+
 SLUG_RE = re.compile(r"(?:\.omd|outputs)/([^/\s'\"]+)/")
 SENTINEL = ".verify-pending"
 
@@ -147,12 +159,25 @@ def build_reminder() -> str:
     )
 
 
+def site_build_reminder() -> str:
+    return (
+        "[OMD document-integrity reminder] site 빌드 명령이 실행됨 (mkdocs).\n"
+        "- 산출 빌드 후 docs-verify 로 카드 gate 를 실행할 것 — references/formats/site.md: "
+        "mkdocs build --strict [validation 블록 필수] / markdownlint / 내부 링크·앵커 / "
+        "built HTML fresh-read / nav 완결성.\n"
+        "- built HTML 은 .omd/<slug>/site-build/ — outputs/<slug>/current/ 안에 site/ 를 만들지 말 것 (D4).\n"
+        "- ⚠️ fresh 실행 증거 없이 done 선언 금지 — '빌드가 돌았다'는 검증이 아니다."
+    )
+
+
 def md_reminder(slug: str) -> str:
     return (
         "[OMD document-integrity reminder] 텍스트 산출물(.md) 편집 감지 (slug: %s).\n"
         "- 편집을 마치면 docs-verify 로 카드가 정의한 **verify gate** 를 실행할 것 — "
         "repo-docs 는 references/formats/repo-docs.md 의 gate(필수 섹션·순서 / 내부 링크 / "
-        "markdownlint / 코드블록 언어 태그 / ISO 날짜·버전 역순 / placeholder 스캔).\n"
+        "markdownlint / 코드블록 언어 태그 / ISO 날짜·버전 역순 / placeholder 스캔), "
+        "site 는 references/formats/site.md 의 gate(mkdocs build --strict [validation 블록 필수] / "
+        "markdownlint / 내부 링크·앵커 / built HTML fresh-read / nav 완결성).\n"
         "- ⚠️ fresh 실행 증거 없이 done 선언 금지 — '읽어보니 괜찮다'는 검증이 아니다.\n"
         "- 다중 파일 산출물의 계약은 outputs/<slug>/current/ + .omd/<slug>/manifest.json "
         "(references/output-layout.md)." % slug
@@ -234,13 +259,16 @@ def main() -> int:
         return 0
     command = (payload.get("tool_input", {}) or {}).get("command", "")
 
+    # verify 실행이 최우선 — strict 빌드가 BUILD_SIGNALS 에 걸려 재-arm 되는 것 방지 (결정 2).
+    try:
+        if command and is_verify_run(command):
+            clear_sentinels(_omd_root(payload), command)
+            return 0
+    except Exception:
+        pass  # fail-open
+
     # 문서 산출/변환 명령일 때만 리마인더. 그 외 Bash 는 침묵.
     if not is_doc_build(command):
-        try:
-            if any(sig in command for sig in VERIFY_SIGNALS):
-                clear_sentinels(_omd_root(payload), command)
-        except Exception:
-            pass
         return 0
 
     try:
@@ -248,7 +276,7 @@ def main() -> int:
     except Exception:
         pass  # fail-open: sentinel is best-effort, reminder still fires
 
-    reminder = build_reminder()
+    reminder = site_build_reminder() if "mkdocs" in command else build_reminder()
     try:
         if reminder_throttled(_omd_root(payload), reminder):
             return 0
