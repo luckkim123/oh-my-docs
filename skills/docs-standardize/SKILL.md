@@ -40,6 +40,13 @@ Analyze several existing documents to inductively extract the *common* standard 
 3. Induce the **common denominator** (fonts/colors/margins/layouts recurring across multiple documents) from the extraction results → style spec.
 4. Fidelity check per the Gate above — render-capable office formats: regenerate one representative page → compare PNGs against the original (≥85%; if below, reinforce the spec); text genres: cross-check the extracted spec against the card's standard-convention checklist.
 5. Present the style spec as the gate → confirm.
+6. **OBS capture (cheap, draft-only)**: if the induced common denominator surfaced a
+   repeatable FORM pattern (the same rule recurring across the population, a re-confirmed
+   preset override, or a user-stated rule), append/refresh the matching `OBS-NNNN` block in
+   `.omd/learned.md` per `learning-protocol.md` §2 — a re-sighting updates
+   `evidence_count`/`last_seen` in place; a new pattern appends a new `status: candidate`
+   block. Draft only (promotion = docs-learn human gate). Never content (§6.F), never a
+   guess. Nothing observed → skip.
 </Steps>
 
 <Output>

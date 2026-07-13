@@ -173,3 +173,12 @@ def test_wiki_write_sites_wired_to_guards():
     for rel in ("skills/docs-pilot/SKILL.md", "skills/docs-learn/SKILL.md"):
         body = (ROOT / rel).read_text(encoding="utf-8")
         assert "safe_wiki_path" in body and "title_to_slug" in body, rel
+
+
+def test_capture_path_wired_in_stages():
+    """§4.5c: the ledger can now actually be filled — pilot 7b + the three
+    observing stages each carry an explicit OBS-capture step."""
+    for rel in ("skills/docs-pilot/SKILL.md", "skills/docs-inspect/SKILL.md",
+                "skills/docs-verify/SKILL.md", "skills/docs-standardize/SKILL.md"):
+        body = (ROOT / rel).read_text(encoding="utf-8")
+        assert "learned.md" in body and "OBS" in body, rel

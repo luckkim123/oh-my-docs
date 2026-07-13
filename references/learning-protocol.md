@@ -222,6 +222,17 @@ Ledger rules (same as omp §2 / oms): append-only (re-observation bumps `evidenc
 concrete evidence (real doc-slugs/events — no guesses, §6.E), honest counter-examples, status
 is a lifecycle not a delete.
 
+### 2.1 Re-sighting update semantics (capture channel)
+
+The ledger is append-only in the sense that **no block is ever deleted or retired by a
+capturing stage** (only `docs-learn` retires, through the human gate — §3, §6.B). A
+*re-sighting* of an already-ledgered pattern does NOT append a duplicate block — it updates
+the existing block in place: `evidence_count += 1`, `last_seen` refreshed, one line added
+under `evidence:`. Only a genuinely new pattern appends a new `OBS-NNNN` block.
+**Capture-then-curate split**: capture (any observing stage — `docs-inspect`, `docs-verify`,
+`docs-standardize`, `docs-pilot`'s Step 7b — cheap, automatic, draft-only) fills the ledger;
+curate (`docs-learn`, human gate) is the only path that changes a default.
+
 ---
 
 ## 3. Promotion criteria (the test `doc-inspector` applies)

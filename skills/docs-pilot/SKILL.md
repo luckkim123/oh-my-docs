@@ -65,6 +65,17 @@ Automatically orchestrates every stage from brief to finished document (intent c
      `.omd/wiki/<category>/`.
    - **Automatic but non-destructive**: append-only (never erases existing lines), creates absent directories, and just passes through if there's nothing to load (an empty session is OK). Both loading and querying use **deterministic text only, no embeddings**. If the user passes `--no-wiki`, skip. For the contract and boundaries, see `references/wiki/README.md`.
    - **⚠️ 2 tiers — append goes local only, global gets a hint only**: automatic append always writes only to the **local** `.omd/wiki/` (this project) (lightweight channel). Queries (`wiki_query`) merge and read local + the parent `.omd/wiki/` (global, ascent). **Global promotion candidate hint (terminal only)**: at pipeline shutdown, if among what accumulated locally this time there are assets *reusable for the next document* (tendencies, organization/type formats, reusable decisions), **suggest** to the user: "Shall I promote this to the parent `.omd/` (global)?" — the actual promotion is performed by `docs-learn`'s local→global path (§4b, human gate), and that step enforces ⚠️ **content 0 (document text, figures, and claims are permanently forbidden globally) + project-identifier scrub (식별자 스크럽)** (remove customer names, internal codenames, confidential paths; keep only abstract form rules — "caption 12pt black" is OK, "ACME deck has red captions" stays local). pilot only suggests — no automatic promotion. Rationale: `skills/docs-learn/SKILL.md` §4b, `references/learning-protocol.md` §1.4·§6.F (cross-project confidentiality isolation).
+   - **7b. heavy-channel OBS capture (cheap, automatic, draft-only)**: if this session
+     *actually observed* a repeatable FORM pattern — the same defect flagged again, the same
+     style preference re-confirmed, or the user stating a rule out loud — append/refresh the
+     matching `OBS-NNNN` block in `.omd/learned.md` (format: `learning-protocol.md` §2):
+     a new pattern appends a new block (`status: candidate`, `source_stage`, one evidence
+     line); a re-sighting of an existing block updates `evidence_count`/`last_seen` and adds
+     one evidence line in place (§2 re-sighting semantics — never delete/retire, that is
+     docs-learn's job). A user-stated rule sets `user_stated: true`. Capture is a *draft*:
+     promotion still requires the docs-learn human gate. Never capture content
+     (text/claims/numbers/sources — §6.F), never capture a guess, keep it to a few lines.
+     Nothing observed → skip silently.
 8. **terminal cleanup** (after verify PASS + the user's final confirmation at gate 3, or when the user explicitly says "clean up" / "work done"):
    - **Aggregate** the cleanup targets in `.omd/<slug>/` (size, count): all of `renders/`·`gen-image/`·`tmp/` + old versions in `versions/` **excluding** the latest one and any user-specified milestones. To choose milestones, show the user the versions list.
    - **AskUserQuestion [clean up / keep]** — never auto-delete, default conservative (keep).

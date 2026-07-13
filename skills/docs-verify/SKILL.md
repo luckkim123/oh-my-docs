@@ -44,6 +44,12 @@ Office integrity = zip CRC · engine parsing · soffice conversion · dangling r
    On mismatch, emit a **warning (WARN) only** — not a FAIL. ⚠️ verify only **reads** the meta, it never repairs it (repair is docs-learn's human-gate job).
 4. Present the PASS/FAIL evidence table at gate 3 (a meta WARN does not count toward FAIL). On FAIL, return to docs-build for the fix loop.
 5. If versions/ exceeds the threshold, suggest cleaning up old versions.
+6. **OBS capture (cheap, draft-only)**: if this gate surfaced a repeatable FORM pattern
+   (a defect that keeps recurring at verify, a re-confirmed style preference, or a
+   user-stated rule), append/refresh the matching `OBS-NNNN` block in `.omd/learned.md`
+   per `learning-protocol.md` §2 — a re-sighting updates `evidence_count`/`last_seen` in
+   place; a new pattern appends a new `status: candidate` block. Draft only (promotion =
+   docs-learn human gate). Never content (§6.F), never a guess. Nothing observed → skip.
 </Steps>
 
 <Output>
