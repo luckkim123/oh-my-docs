@@ -2,10 +2,14 @@
 
 All notable changes to oh-my-docs (omd).
 
-> **Versioning policy**: omd deliberately uses **commit-SHA versioning** (no individual release numbers).
-> This file tracks only the *contract change history* — when a surface that other
-> components (omha, the session LLM) depend on changes, such as a hook's emit format, it is recorded here. General content
-> changes have the git log as the SSOT. Tone unified with the OMS (oh-my-scholar) CHANGELOG.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/). Version
+SSOT: `.claude-plugin/plugin.json` `version`.
+
+> **Policy note (2026-07-13, R1)**: the earlier deliberate **commit-SHA versioning** policy is
+> superseded by the R1–R4 release train (spec: `docs/superpowers/specs/2026-07-11-omd-program-design.md` §5).
+> Entries below predating v0.1.0 were written under the old policy and stay as-is;
+> the git log remains the SSOT for pre-semver general content changes.
 
 ## [Unreleased]
 
