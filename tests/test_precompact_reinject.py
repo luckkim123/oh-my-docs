@@ -8,6 +8,10 @@ import unittest
 
 HOOK = os.path.join(os.path.dirname(__file__), "..", "hooks", "precompact_reinject.py")
 PLUGIN_JSON = os.path.join(os.path.dirname(__file__), "..", ".claude-plugin", "plugin.json")
+HOOK_DIR = os.path.join(os.path.dirname(__file__), "..", "hooks")
+sys.path.insert(0, HOOK_DIR)
+
+import precompact_reinject  # noqa: E402
 
 NOTEPAD = """# omd notepad
 
@@ -82,6 +86,68 @@ class TestPrune(unittest.TestCase):
             before = open(path, encoding="utf-8").read()
             run_hook({"hook_event_name": "PreCompact", "trigger": "manual", "cwd": tmp})
             self.assertEqual(open(path, encoding="utf-8").read(), before)
+
+
+class TestFailureModes(unittest.TestCase):
+    def test_dir_shaped_notepad_is_silent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, ".omd", "notepad.md"))  # dir, not a file
+            out1 = run_hook({"hook_event_name": "SessionStart", "source": "compact", "cwd": tmp})
+            self.assertEqual(out1.returncode, 0)
+            self.assertEqual(out1.stdout.strip(), "")
+            out2 = run_hook({"hook_event_name": "PreCompact", "trigger": "auto", "cwd": tmp})
+            self.assertEqual(out2.returncode, 0)
+            self.assertEqual(out2.stdout.strip(), "")
+
+    @unittest.skipUnless(not hasattr(os, "geteuid") or os.geteuid() != 0,
+                          "chmod cannot block root")
+    def test_prune_write_failure_leaves_original_intact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            lines = [f"- working item {i} " + "x" * 300 for i in range(60)]
+            path = write_notepad(tmp, lines)
+            before = open(path, encoding="utf-8").read()
+            omd_dir = os.path.join(tmp, ".omd")
+            os.chmod(omd_dir, 0o555)  # read+exec only — mkstemp() can't create a file here
+            try:
+                out = run_hook({"hook_event_name": "PreCompact", "trigger": "auto", "cwd": tmp})
+                self.assertEqual(out.returncode, 0)
+                self.assertEqual(open(path, encoding="utf-8").read(), before)
+                self.assertEqual([f for f in os.listdir(omd_dir) if ".tmp" in f], [])
+            finally:
+                os.chmod(omd_dir, 0o755)
+
+    def test_missing_working_notes_section_untouched(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, ".omd"), exist_ok=True)
+            path = os.path.join(tmp, ".omd", "notepad.md")
+            padding = "\n".join(f"- manual pad {i} " + "x" * 300 for i in range(60))
+            body = (
+                "# omd notepad\n\n"
+                "## Priority Context\n"
+                "- no in-place modification of the original\n\n"
+                "## Manual\n"
+                "- user's own line — never touched\n"
+                f"{padding}\n"
+            )
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(body)
+            self.assertGreater(os.path.getsize(path), 16 * 1024)  # oversized, no Working Notes
+            before = open(path, encoding="utf-8").read()
+            out = run_hook({"hook_event_name": "PreCompact", "trigger": "auto", "cwd": tmp})
+            self.assertEqual(out.returncode, 0)
+            after = open(path, encoding="utf-8").read()
+            self.assertEqual(after, before)  # Priority/Manual intact — only Working Notes is prunable
+            self.assertGreater(os.path.getsize(path), 16 * 1024)  # still over cap
+
+    def test_second_prune_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            lines = [f"- working item {i} " + "x" * 300 for i in range(60)]
+            path = write_notepad(tmp, lines)
+            precompact_reinject.prune(path)
+            after_first = open(path, encoding="utf-8").read()
+            precompact_reinject.prune(path)
+            after_second = open(path, encoding="utf-8").read()
+            self.assertEqual(after_second, after_first)
 
 
 class TestRegistration(unittest.TestCase):
