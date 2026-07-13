@@ -18,6 +18,7 @@ Noise control: most Bash commands are not document builds, so the hook stays
 SILENT unless a build/convert signal AND a document extension both appear. A
 read-only render (pdftoppm) or integrity check (unzip -t) alone does not trigger
 it. Fail-open: any error returns 0 so the session is never blocked."""
+import hashlib
 import json
 import os
 import re
@@ -49,6 +50,11 @@ RUN_SCRIPT_RE = re.compile(
 VERIFY_SIGNALS = ("pdftoppm", "unzip -t")
 SLUG_RE = re.compile(r"(?:\.omd|outputs)/([^/\s'\"]+)/")
 SENTINEL = ".verify-pending"
+
+# HG-3: same-content reminder cooldown — silences repeat message noise only;
+# sentinel arm (G1 state) always happens regardless of throttling.
+THROTTLE_FILE = ".hook-throttle.json"
+DEFAULT_COOLDOWN = 600.0
 
 
 def _omd_root(payload):
@@ -117,6 +123,41 @@ def build_reminder() -> str:
     )
 
 
+def _cooldown_seconds():
+    try:
+        return float(os.environ.get("OMD_REMINDER_COOLDOWN_SECONDS", DEFAULT_COOLDOWN))
+    except ValueError:
+        return DEFAULT_COOLDOWN
+
+
+def reminder_throttled(root: str, message: str) -> bool:
+    """True → suppress this reminder (same content within cooldown). Fail-open: any
+    IO/JSON error answers False (fire the reminder — silence is the risky side)."""
+    cooldown = _cooldown_seconds()
+    if cooldown <= 0:
+        return False
+    path = os.path.join(root, THROTTLE_FILE)
+    digest = hashlib.sha256(message.encode("utf-8")).hexdigest()
+    now = time.time()
+    try:
+        with open(path, encoding="utf-8") as f:
+            seen = json.load(f)
+    except Exception:
+        seen = {}
+    throttled = isinstance(seen, dict) and now - float(seen.get(digest, 0) or 0) < cooldown
+    if not throttled:
+        try:
+            seen = seen if isinstance(seen, dict) else {}
+            seen[digest] = now
+            fd, tmp = tempfile.mkstemp(dir=root, prefix=".tmp-throttle-")
+            with os.fdopen(fd, "w") as f:
+                json.dump(seen, f)
+            os.replace(tmp, path)
+        except Exception:
+            pass  # recording failure must not suppress the reminder
+    return throttled
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -141,9 +182,16 @@ def main() -> int:
     except Exception:
         pass  # fail-open: sentinel is best-effort, reminder still fires
 
+    reminder = build_reminder()
+    try:
+        if reminder_throttled(_omd_root(payload), reminder):
+            return 0
+    except Exception:
+        pass  # fail-open: on any doubt, fire the reminder
+
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PostToolUse",
-        "additionalContext": build_reminder(),
+        "additionalContext": reminder,
     }}))
     return 0
 
