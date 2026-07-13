@@ -15,6 +15,41 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-14
+
+Site genre: MkDocs + Material static documentation sites join the harness as a card
+(D1 — no new skill), with machine-measured engine stamps and omd's own docs site as
+the E2E pilot.
+
+### Added
+- `references/formats/site.md` — site genre card: uvx-run MkDocs engine table (measured
+  on this machine), Diátaxis structure frames, standard mkdocs.yml skeleton with a
+  mandatory `validation:` block, 5-item deterministic verify gate, built-HTML placement
+  rule (`.omd/<slug>/site-build/`, never inside `current/`).
+- `references/rubrics/site-rubric.md` — 2 qualitative lenses (Information architecture /
+  Prose quality); build & link integrity stays mechanical in the card gate (PS-3).
+- E2E pilot: omd's own docs site built through the pipeline and pinned as
+  `tests/fixtures/omd-site/` with a stdlib permanent guard (`tests/test_site_dogfood.py`).
+- `mkdocs build` signals in `docs_verify_emit.py` with verify-first matching — a
+  `--strict` run clears the verify sentinel instead of re-arming it.
+
+### Changed
+- Route checkpoint advertises `site` (R2 pin test inverted — advertising synced to card
+  existence); format enumerations updated across route tests.
+- Front pipeline (docs-intake, doc-analyzer) and docs-build carry the site genre frame;
+  docs-build gate/steps/output generalized beyond PNG evidence (fresh-read for text genres).
+- Carryover cosmetics: plugin description and README name the text genres; doc-planner
+  checklist asks for "exactly one structure frame" instead of a narrative arc.
+
+> **Verification**: python3 -m pytest tests/ -q — 136 passed (Task 11 Step 3 실측값 기입) ·
+> site pilot gates measured green: `mkdocs build --strict` exit 0 + markdownlint-cli2 exit 0
+> (logs under `.omd/omd-site/verify-runs/`, uncommitted by policy).
+
+> **Notes**: MQ-2 (fenced-JSON verify output) re-rejected at R3 — no consumer emerged
+> (docs-revise consumes the table; verify-runs/ carries machine evidence); user-ratified at
+> merge. lychee remains optional/UNVERIFIED. CJK search trap stays a candidate (pilot is
+> English). Engine stamps use ephemeral runners (uvx/npx) — no global installs.
+
 ## [0.2.0] - 2026-07-13
 
 R2 "repo-docs genre" — first text genre lands via card-only extension (D1: new format =
