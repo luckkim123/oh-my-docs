@@ -79,7 +79,7 @@ def test_context_lists_formats():
     xlsx 는 references/formats/xlsx.md 카드(openpyxl/xlsxwriter 라우팅, <v>0</v> 함정,
     구조검증 게이트)가 실재하므로 포맷 목록에 포함돼야 한다 (2026-05-31 신설)."""
     out = context_of(run_hook({"prompt": "발표자료"}))
-    for fmt in ("pptx", "docx", "xlsx", "hwpx", "repo-docs"):
+    for fmt in ("pptx", "docx", "xlsx", "hwpx", "repo-docs", "site"):
         assert fmt in out, f"format '{fmt}' missing from contract"
 
 
@@ -166,8 +166,10 @@ def test_repo_docs_in_stage_token_line():
     assert stage_lines and "repo-docs" in stage_lines[0]
 
 
-def test_site_not_advertised_before_card_exists():
-    """R2 결정 2: site 토큰은 카드가 실재하는 R3에서 — 카드 없는 포맷 광고는 H1 동형 결함."""
+def test_site_advertised_with_card():
+    """R3: site 카드가 실재하므로 FORMAT 슬롯 광고 해제 (R2 pin 의 반전 — 광고는 카드 실존과 동기)."""
+    card = Path(__file__).parent.parent / "references" / "formats" / "site.md"
+    assert card.is_file(), "advertising requires the card to exist (H1-isomorphic rule)"
     out = context_of(run_hook({"prompt": "문서 사이트 만들어줘"}))
     stage_lines = [l for l in out.splitlines() if l.startswith("STAGE(docs)")]
-    assert stage_lines and "site" not in stage_lines[0]
+    assert stage_lines and "site" in stage_lines[0]
