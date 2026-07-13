@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
 SCANNED = sorted((ROOT / "skills").glob("*/SKILL.md")) + sorted((ROOT / "agents").glob("*.md"))
-REF_RE = re.compile(r"references/[A-Za-z0-9_\-./]+")
+REF_RE = re.compile(r"references/[A-Za-z0-9_\-./<>{}*]+")
 
 
 def _concrete_refs(text):
