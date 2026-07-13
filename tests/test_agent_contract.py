@@ -70,3 +70,34 @@ def test_final_response_contract_markers():
 def test_self_approval_ban_present():
     for name, phrase in SELF_APPROVAL_BANS.items():
         assert phrase in _body(name), f"{name}: self-approval ban phrase {phrase!r} missing"
+
+
+# ── R2 (§4.4-3·4): 뒷단 쌍의 카드 위임 일반화 계약 ─────────────────────
+# doc-verifier.md:46이 self-gate(builder)/독립재검증(verifier)을 쌍으로 명시하므로
+# 두 파일은 같은 커밋에서 함께 일반화된다(PS-5) — 이 마커들이 쌍의 존재 증거.
+GENERALIZATION_MARKERS = {
+    "doc-verifier": [
+        "card-defined verify gate",          # F3: integrity를 카드 위임으로
+        "manifest.json",                     # AC-5: artifact-set 스냅샷 식별자
+        "verify-runs/",                      # AC-1b: 빌린 엔진 로그 캡처
+        "UNVERIFIED (engine unavailable)",   # D3: 엔진 미설치 degrade verdict
+    ],
+    "doc-builder": [
+        "artifact-set",                      # D4: 다중 파일 산출 계약
+        "manifest.json",
+        "os.replace",                        # ST-1: manifest atomic write
+    ],
+}
+
+
+def test_backend_pair_generalized_to_card_delegation():
+    for name, markers in GENERALIZATION_MARKERS.items():
+        body = _body(name)
+        for marker in markers:
+            assert marker in body, f"{name}: R2 generalization marker {marker!r} missing"
+
+
+def test_backend_pair_keeps_office_contract():
+    # 하위 호환: 오피스 계열 계약(5-check·shape assertion)은 카드 위임 후에도 서술 보존
+    assert "zip CRC" in _body("doc-verifier")
+    assert "assert_shapes.py" in _body("doc-builder")
