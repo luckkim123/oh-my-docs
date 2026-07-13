@@ -4,7 +4,13 @@ no absolute home paths, no machine-specific values in any shipped file.
 Per spec DT-3: patterns only, NEVER literal personal tokens (writing this session's
 username into the forbidden list would itself violate the axiom). Placeholders like
 `/Users/<you>` are allowed (the `<` immediately after the home root marks a template).
+
+R2 policy (user-ratified via the R2 PR): plugin.json `author` is deliberate attribution
+metadata — the package.json convention — and is the ONE sanctioned identifier in shipped
+files. It is name-only attribution; the pattern scans below still apply to it (no home
+path, no email in the author block either).
 """
+import json
 import re
 from pathlib import Path
 
@@ -40,3 +46,12 @@ def test_no_absolute_home_paths():
 def test_no_email_addresses():
     hits = _hits(EMAIL_RE)
     assert not hits, "email addresses in shipped files:\n" + "\n".join(hits)
+
+
+def test_author_field_is_intentional_attribution():
+    """R2 정책: author 필드는 의도적 attribution — 존재 유지 + 패턴 스캔은 그대로 적용
+    (홈경로·이메일이 author 블록에 스며들면 위 테스트들이 잡는다). 리터럴 개인 토큰은
+    이 테스트에도 넣지 않는다(DT-3)."""
+    manifest = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+    author = manifest.get("author", {})
+    assert isinstance(author, dict) and author.get("name"), "author attribution should stay present"
