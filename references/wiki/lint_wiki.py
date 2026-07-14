@@ -15,6 +15,11 @@ import re
 import sys
 
 CATEGORIES = ("convention", "pattern", "decision", "reference")
+# Family wiki-status convention (soft/warn only — omd has no gating boundary):
+# `needs-revision` = a measured style/spec correction recorded but not yet applied;
+# `resolved` = terminal. Absent = not actionable (every existing note).
+STATUS_VALUES = ("needs-revision", "resolved")
+_STATUS = re.compile(r"^status:\s*(\S+)", re.M)
 WIKILINK = re.compile(r"\[\[([^\]|#]+)")
 NEAR_DUP_JACCARD = 0.5
 _STOP = frozenset({"the", "a", "an", "and", "or", "of", "to", "is", "in", "on",
@@ -80,6 +85,18 @@ def scan(root, now=None, stale_days=90, max_bytes=10240):
         if cat == "convention" and not re.search(r"^confidence:", body, re.M):
             issues.append(("info", "missing-confidence", rel,
                            "convention note without a confidence: marker"))
+        status_m = _STATUS.search(body)
+        if status_m:
+            value = status_m.group(1)
+            if value == "needs-revision":
+                # keyword-independent enumeration: an open correction must ride
+                # every docs-verify/docs-learn pass until resolved.
+                issues.append(("warning", "open-revision", rel,
+                               "open needs-revision — apply the correction or resolve it"))
+            elif value not in STATUS_VALUES:
+                # a typo'd status silently leaves the enumeration -> flag it.
+                issues.append(("warning", "unknown-status", rel,
+                               f"status {value!r} not in {STATUS_VALUES}"))
         for target in WIKILINK.findall(body):
             target = target.strip()
             if target in stems:
