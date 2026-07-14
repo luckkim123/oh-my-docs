@@ -1,6 +1,6 @@
 {
   "name": "oh-my-docs",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Multi-agent orchestration harness specialized for document work (office: pptx/docx/xlsx/hwpx · text genres: repo-docs, site)",
   "author": { "name": "kimseungmin" },
   "license": "MIT",
@@ -74,6 +74,30 @@
             "type": "command",
             "command": "python3",
             "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/docs_stop_guard.py"]
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/precompact_reinject.py"]
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/precompact_reinject.py"]
           }
         ]
       }

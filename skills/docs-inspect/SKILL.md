@@ -42,6 +42,12 @@ The format's rubric card is the single source of truth — office: references/ru
 
 **Common**:
 3. Present the ranked improvement list to the user (advice — not a verdict).
+4. **OBS capture (cheap, draft-only)**: if this review surfaced a repeatable FORM pattern
+   (a recurring defect flagged again, a re-confirmed style preference, or a user-stated
+   rule), append/refresh the matching `OBS-NNNN` block in `.omd/learned.md` per
+   `learning-protocol.md` §2 — a re-sighting updates `evidence_count`/`last_seen` in place;
+   a new pattern appends a new `status: candidate` block. Draft only (promotion = docs-learn
+   human gate). Never content (§6.F), never a guess. Nothing observed → skip.
 </Steps>
 
 <Multi_Lens_When>

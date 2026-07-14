@@ -44,7 +44,7 @@ Per-format tools, pitfalls, math, and version policy are the **single source of 
 <Steps>
 1. Dispatch doc-builder (pass the outline + the design system from analyzer/standardize):
    `Task(subagent_type="oh-my-docs:doc-builder", ...)`
-2. The builder reads the card → (if a revision) snapshots to `.omd/<slug>/versions/` → build script → produce → math (VERIFIED path) → its own sanity evidence (office: PNG render into `.omd/<slug>/renders/current/`; text genres: fresh-read — site builds into `.omd/<slug>/site-build/`).
+2. The builder reads the card → (if a revision) snapshots to `.omd/<slug>/versions/` → build script → produce → math (VERIFIED path) → its own sanity evidence (office: PNG render into `.omd/<slug>/renders/current/`; text genres: fresh-read — site builds into `.omd/<slug>/site-build/`). Artifact-set rebuild: before overwriting files under `current/`, run the ownership guard — `references/output-layout.md` §3.4 (manifest check; unlisted/hash-drifted → AskUserQuestion).
 3. Present the deliverable (single-file: outputs/<slug>/current.<ext>; artifact-set: outputs/<slug>/current/) + the sanity evidence (office: PNG; site: built-HTML fresh-read) at gate 2 → confirm.
 </Steps>
 

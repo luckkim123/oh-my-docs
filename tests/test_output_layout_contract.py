@@ -43,3 +43,17 @@ def test_role_field_carries_placement():
 def test_single_file_formats_unchanged():
     # 하위 호환: 오피스 단일 파일 경로 보존
     assert "current.<ext>" in CARD
+
+
+def test_ownership_guard_section_present():
+    """G6: overwrite/delete under an artifact-set current/ must consult the manifest."""
+    assert "### 3.4 Ownership guard (G6)" in CARD
+    assert "AskUserQuestion" in CARD.split("### 3.4")[1].split("## 4.")[0]
+
+
+def test_ownership_guard_consumers_wired():
+    root = Path(__file__).parent.parent
+    for rel in ("skills/docs-build/SKILL.md", "skills/docs-revise/SKILL.md",
+                "agents/doc-builder.md"):
+        body = (root / rel).read_text(encoding="utf-8")
+        assert "3.4" in body and "manifest" in body.lower(), rel

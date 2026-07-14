@@ -24,6 +24,10 @@ It is the current backing for the `wiki_query(category)` abstract function, and 
   pattern/      *.md   ← disposition (favored phrasing/layout/working-style/preferences) — light only
   decision/     *.md   ← reusable decisions ("defense decks always lead with the contribution slide")
         ▲  discovery = ascent (cwd→parent, the nearest ancestor .omd/, excluding self; git's .git-lookup)
+        │   ⚠️ the ascent never climbs above the user's home directory (ST-3) — the home
+        │   directory is the hard lower bound, so unrelated projects can never merge through
+        │   an accidental common ancestor above it (the confidentiality gate stays intact
+        │   on shallow trees).
         │
 <project root>/.omd/wiki/                ← LOCAL level — specific to THIS document project (outside <slug>/, carries across sessions)
   convention/   *.md   ← this project's defect patterns + induced style specs (inspector reads this) — ⭐ source of heavy-channel candidates
@@ -32,7 +36,11 @@ It is the current backing for the `wiki_query(category)` abstract function, and 
   reference/    *.md   ← this project's pointers to external resources (brand guide, accessibility rubric)
 ```
 
-- One file = one topic (e.g. `convention/defense-defect-patterns.md`, `convention/lab-style-spec.md`).
+- One file = one topic (e.g. `convention/defense-defect-patterns.md`). Filenames are
+  **English-keyword slugs even when the topic is Korean** (paraphrase to English keywords —
+  KN-4). When writing via code, use `query_helper.title_to_slug()` — it owns the deterministic
+  hash fallback; never improvise a hash inline. Validate the target with
+  `query_helper.safe_wiki_path()` before any Write into `.omd/wiki/**` (KN-3).
 - Each file is free-form human-readable .md. No machine-parse schema (grep only).
 - `category` maps 1:1 to the sub-directory names (local: `convention`·`pattern`·`decision`·`reference`; global: `convention`·`pattern`·`decision`).
 - ⚠️ `.omd/wiki/` is *project-wide* accrual, so it lives **outside** the per-job `.omd/<slug>/` (output-layout) — it is not tied to a slug and survives across sessions/jobs.
@@ -86,7 +94,12 @@ wiki_query(category) → list of matched .md excerpts (empty list if none)
   global_hits = grep(parent_omd/wiki/<category>/, keywords) if parent_omd else []  # global — user/org reuse
   return merge(local_hits, global_hits)   # provenance-tagged [wiki:local] / [wiki:global]
   ```
-  Deterministic grep only (keyword matching, incl. CJK bi-gram). The caller (inspector) greps by presentation-type / disposition keywords to pull relevant excerpts. category for the local level is one of the four (`convention`·`pattern`·`decision`·`reference`); the global level carries `convention`·`pattern`·`decision` (no `history` — see layout above). (Either level — missing directory → that level is an empty list; a fresh project starts from an empty store.)
+  Deterministic grep only (keyword matching, incl. CJK bi-gram — implemented by
+  `references/wiki/query_helper.py`; shell out `python3 <plugin>/references/wiki/query_helper.py
+  match <category-dir> "<query>"` when python3 is available, plain grep as the degrade path).
+  ⚠️ `ascent` never climbs above the user's home directory (ST-3) — same hard lower bound
+  as the layout diagram above.
+  The caller (inspector) greps by presentation-type / disposition keywords to pull relevant excerpts. category for the local level is one of the four (`convention`·`pattern`·`decision`·`reference`); the global level carries `convention`·`pattern`·`decision` (no `history` — see layout above). (Either level — missing directory → that level is an empty list; a fresh project starts from an empty store.)
 - **Caller/implementation boundary (future swap point)**: the inspector calls an *abstract function* `wiki_query`; it does not know whether the implementation is "two-level grep" or a standalone MCP. **The ascent, the merge, and the provenance-tagging are all sealed inside this function** — the call site (inspector pre-commitment) does not change by a single line. If a standalone wiki MCP is later adopted, swap only this function's implementation.
 - **Graceful degrade on absence**: if either the local or the global level is empty, or there is no ancestor `.omd/`, that level returns an empty list — not an error. The inspector proceeds on what exists (or on its own prediction).
 

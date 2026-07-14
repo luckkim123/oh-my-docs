@@ -40,7 +40,7 @@ Fixes an existing document until verify gives a PASS. Repeats doc-builder (fixes
 <Steps>
 1. Diagnose current state: `Task(subagent_type="oh-my-docs:doc-verifier", ...)` → list of FAIL items. Record the previous round's defects (to track recurrence of the same defect).
 2. **Loop**:
-   a. Fix: `Task(subagent_type="oh-my-docs:doc-builder", ...)` — FAIL items only (snapshot to `.omd/<slug>/versions/` for large fixes).
+   a. Fix: `Task(subagent_type="oh-my-docs:doc-builder", ...)` — FAIL items only (snapshot to `.omd/<slug>/versions/` for large fixes). Artifact-set rebuild: before overwriting files under `current/`, run the ownership guard — `references/output-layout.md` §3.4 (manifest check; unlisted/hash-drifted → AskUserQuestion).
    b. Re-verify: `Task(subagent_type="oh-my-docs:doc-verifier", ...)` — fresh integrity 5/5 + full read-through.
    c. All acceptance criteria (4 items, 1.–2. combined above) satisfied → terminate (PASS). If any one falls short, check whether it is the same defect recurring:
       - Same defect 3rd time → stop and report "fundamental issue".
