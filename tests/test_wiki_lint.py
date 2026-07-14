@@ -73,5 +73,44 @@ class TestScan(unittest.TestCase):
             self.assertIn("total", out.stdout)    # 요약 줄
 
 
+class TestActionableStatus(unittest.TestCase):
+    """Family wiki-status convention: an open `needs-revision` note must be
+    enumerable keyword-independently; a typo'd status must not vanish silently."""
+
+    def _scan_one(self, body):
+        with tempfile.TemporaryDirectory() as tmp:
+            conv = os.path.join(tmp, "convention"); os.makedirs(conv)
+            open(os.path.join(conv, "n.md"), "w", encoding="utf-8").write(body)
+            return {t for _, t, _, _ in lint_wiki.scan(tmp, now=NOW)}
+
+    def test_open_revision_enumerated(self):
+        types = self._scan_one(
+            "---\nconfidence: high\nstatus: needs-revision\n---\n# n\nbody\n")
+        self.assertIn("open-revision", types)
+
+    def test_resolved_not_enumerated(self):
+        types = self._scan_one(
+            "---\nconfidence: high\nstatus: resolved\n---\n# n\nbody\n")
+        self.assertNotIn("open-revision", types)
+
+    def test_no_status_no_finding(self):
+        types = self._scan_one("---\nconfidence: high\n---\n# n\nbody\n")
+        self.assertNotIn("open-revision", types)
+        self.assertNotIn("unknown-status", types)
+
+    def test_unknown_status_warns(self):
+        types = self._scan_one(
+            "---\nconfidence: high\nstatus: need-revison\n---\n# n\nbody\n")
+        self.assertIn("unknown-status", types)
+
+    def test_empty_status_line_is_no_status(self):
+        """`status:` with no value must NOT capture the next line's key — treat
+        as no status (matches the grep fallback, which is line-anchored)."""
+        types = self._scan_one(
+            "---\nconfidence: high\nstatus:\nblocked-on: revise heading\n---\n# n\nbody\n")
+        self.assertNotIn("unknown-status", types)
+        self.assertNotIn("open-revision", types)
+
+
 if __name__ == "__main__":
     unittest.main()

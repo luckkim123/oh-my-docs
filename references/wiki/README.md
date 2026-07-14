@@ -79,6 +79,26 @@ sightings: 3
 ...
 ```
 
+### actionable status — a recorded correction must not silently stall (family wiki-status convention)
+
+A note may carry an optional frontmatter `status: needs-revision | resolved` (plus `blocked-on: <free text>`
+while open). `needs-revision` marks a measured style/spec correction that is **recorded but not yet
+applied**; `resolved` is terminal (say why in a dated body section — the note is never deleted).
+**Absent = not actionable** (every existing note). This closes the family failure mode where an
+actionable finding is archived in the wiki yet silently dropped before the next build/promotion.
+
+- **Enumeration is deterministic grep** (omd's "grep only" contract, no schema): `grep -rlE
+  '^status:[[:space:]]*needs-revision[[:space:]]*$' .omd/wiki/` lists every open correction
+  keyword-independently (anchored `$` so it matches the linter's exact-token semantics, not
+  `needs-revision-old`). When
+  `python3` is available, `references/wiki/lint_wiki.py` also surfaces each as an `open-revision`
+  warning, and flags a mistyped value as `unknown-status` (a typo would silently leave the
+  enumeration). The on-disk `status:`/`blocked-on:` keys are identical across every om* harness, so
+  the grep is family-wide.
+- **Carry-forward boundary**: `docs-verify` and `docs-learn` run this enumeration before a build /
+  style-promotion and name any open `needs-revision` note as a warning finding — so a measured
+  correction cannot be built over unknowingly. WARN only (omd never hard-gates on the wiki).
+
 ---
 
 ## `wiki_query(category)` abstract-function contract

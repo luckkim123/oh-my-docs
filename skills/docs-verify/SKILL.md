@@ -42,6 +42,7 @@ Office integrity = zip CRC · engine parsing · soffice conversion · dangling r
    self-specialization meta, check only its integrity: is `specificity` ∈ [0,1] and does it match `(count of origin∈{inductive,learned})/(count of active defaults)`,
    and does every `learned` origin have `learned_refs` provenance (no §6.C silent change)?
    On mismatch, emit a **warning (WARN) only** — not a FAIL. ⚠️ verify only **reads** the meta, it never repairs it (repair is docs-learn's human-gate job).
+3b. **open wiki corrections carry-forward (read-only, WARN — family wiki-status convention)** — enumerate every open `needs-revision` note in the wiki: `grep -rlE '^status:[[:space:]]*needs-revision[[:space:]]*$' .omd/wiki/` (or `python3 <plugin>/references/wiki/lint_wiki.py --root .omd/wiki`, reading its `open-revision` rows). Each is a **WARN** naming the note — a measured style/spec correction recorded in the wiki must not be built over unknowingly. It does not FAIL the gate (omd never hard-gates on the wiki); it forces the correction into view so a human either applies it or resolves it. No wiki store → skip silently.
 4. Present the PASS/FAIL evidence table at gate 3 (a meta WARN does not count toward FAIL). On FAIL, return to docs-build for the fix loop.
 5. If versions/ exceeds the threshold, suggest cleaning up old versions.
 6. **OBS capture (cheap, draft-only)**: if this gate surfaced a repeatable FORM pattern

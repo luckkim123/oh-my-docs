@@ -15,6 +15,28 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-14
+
+### Added
+- **Actionable-status wiki convention (family wiki-status backport)** — `references/wiki/README.md`,
+  `references/wiki/lint_wiki.py`, `skills/docs-verify/SKILL.md`, `skills/docs-learn/SKILL.md`,
+  `tests/test_wiki_lint.py`. A wiki note may now carry an optional `status: needs-revision | resolved`
+  frontmatter field (plus `blocked-on: <free text>` while open). `needs-revision` marks a measured
+  style/spec correction that is recorded but not yet applied; `resolved` is terminal; **absent = not
+  actionable** (every existing note). This closes the om*-family failure mode where an actionable
+  finding is archived in the wiki yet silently dropped before the next build/promotion.
+  - `lint_wiki.py` gains two report-only findings (still exit 0, WARN-never-gate): `open-revision`
+    enumerates every open `needs-revision` note keyword-independently, and `unknown-status` flags a
+    mistyped value (which would otherwise silently leave the enumeration).
+  - `docs-verify` (step 3b) and `docs-learn` (step 0) now surface open `needs-revision` notes as a
+    named WARN before a build / style-promotion — a measured correction cannot be built or promoted
+    over unknowingly. WARN only; omd never hard-gates on the wiki.
+  - Enumeration stays omd's "grep only" contract: `grep -rlE '^status:[[:space:]]*needs-revision[[:space:]]*$'
+    .omd/wiki/` is the family-wide fallback (the on-disk `status:`/`blocked-on:` keys match every om* harness).
+  - Backwards compatible / additive-optional: notes without a `status` key never surface and are
+    byte-unchanged; the linter stays report-only (exit 0). No new subsystem, storage, or scheduler —
+    the existing `lint_wiki.py` is the enumeration surface and docs-verify/docs-learn are the boundary.
+
 ## [0.4.0] - 2026-07-14
 
 R4 "knowledge lifecycle" — the capture-then-curate loop closes: query helpers make the
