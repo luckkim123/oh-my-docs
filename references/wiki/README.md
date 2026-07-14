@@ -87,9 +87,10 @@ applied**; `resolved` is terminal (say why in a dated body section — the note 
 **Absent = not actionable** (every existing note). This closes the family failure mode where an
 actionable finding is archived in the wiki yet silently dropped before the next build/promotion.
 
-- **Enumeration is deterministic grep** (omd's "grep only" contract, no schema): `grep -rlnE
-  '^status:\s*needs-revision' .omd/wiki/` lists every open correction keyword-independently (the
-  `\s*` matches the linter's `^status:\s*` tolerance for spacing). When
+- **Enumeration is deterministic grep** (omd's "grep only" contract, no schema): `grep -rlE
+  '^status:[[:space:]]*needs-revision[[:space:]]*$' .omd/wiki/` lists every open correction
+  keyword-independently (anchored `$` so it matches the linter's exact-token semantics, not
+  `needs-revision-old`). When
   `python3` is available, `references/wiki/lint_wiki.py` also surfaces each as an `open-revision`
   warning, and flags a mistyped value as `unknown-status` (a typo would silently leave the
   enumeration). The on-disk `status:`/`blocked-on:` keys are identical across every om* harness, so

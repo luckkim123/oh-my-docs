@@ -103,6 +103,14 @@ class TestActionableStatus(unittest.TestCase):
             "---\nconfidence: high\nstatus: need-revison\n---\n# n\nbody\n")
         self.assertIn("unknown-status", types)
 
+    def test_empty_status_line_is_no_status(self):
+        """`status:` with no value must NOT capture the next line's key — treat
+        as no status (matches the grep fallback, which is line-anchored)."""
+        types = self._scan_one(
+            "---\nconfidence: high\nstatus:\nblocked-on: revise heading\n---\n# n\nbody\n")
+        self.assertNotIn("unknown-status", types)
+        self.assertNotIn("open-revision", types)
+
 
 if __name__ == "__main__":
     unittest.main()

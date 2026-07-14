@@ -19,7 +19,11 @@ CATEGORIES = ("convention", "pattern", "decision", "reference")
 # `needs-revision` = a measured style/spec correction recorded but not yet applied;
 # `resolved` = terminal. Absent = not actionable (every existing note).
 STATUS_VALUES = ("needs-revision", "resolved")
-_STATUS = re.compile(r"^status:\s*(\S+)", re.M)
+# [^\S\n] = whitespace but NOT a newline: a bare `status:` (no value) must not let
+# \s* cross the line and capture the next key (e.g. `blocked-on:`) as the value.
+# An empty status simply produces no match -> treated as "no status" (matches the
+# line-anchored grep fallback).
+_STATUS = re.compile(r"^status:[^\S\n]*(\S+)", re.M)
 WIKILINK = re.compile(r"\[\[([^\]|#]+)")
 NEAR_DUP_JACCARD = 0.5
 _STOP = frozenset({"the", "a", "an", "and", "or", "of", "to", "is", "in", "on",

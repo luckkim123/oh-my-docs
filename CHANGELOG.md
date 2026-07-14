@@ -31,8 +31,8 @@ SSOT: `.claude-plugin/plugin.json` `version`.
   - `docs-verify` (step 3b) and `docs-learn` (step 0) now surface open `needs-revision` notes as a
     named WARN before a build / style-promotion — a measured correction cannot be built or promoted
     over unknowingly. WARN only; omd never hard-gates on the wiki.
-  - Enumeration stays omd's "grep only" contract: `grep -rlnE '^status:\s*needs-revision' .omd/wiki/`
-    is the family-wide fallback (the on-disk `status:`/`blocked-on:` keys match every om* harness).
+  - Enumeration stays omd's "grep only" contract: `grep -rlE '^status:[[:space:]]*needs-revision[[:space:]]*$'
+    .omd/wiki/` is the family-wide fallback (the on-disk `status:`/`blocked-on:` keys match every om* harness).
   - Backwards compatible / additive-optional: notes without a `status` key never surface and are
     byte-unchanged; the linter stays report-only (exit 0). No new subsystem, storage, or scheduler —
     the existing `lint_wiki.py` is the enumeration surface and docs-verify/docs-learn are the boundary.
