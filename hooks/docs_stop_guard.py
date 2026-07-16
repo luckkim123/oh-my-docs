@@ -14,9 +14,40 @@ import sys
 import time
 
 SENTINEL = ".verify-pending"
-STALE_AFTER = 6 * 3600  # older = carried over from an earlier session (HK-4; no TTL expiry)
+STALE_AFTER = 6 * 3600  # older = carried over from an earlier session (HK-4)
+# G7: slugged sentinels have no TTL (HK-4 — real carried-over work stays visible),
+# but a SLUGLESS root sentinel names no .omd/<slug>/ workspace, so in a workspace
+# that never runs verify signals nothing ever clears it — it would re-warn
+# "(slug unknown)" at every Stop forever (2026-07-15 vault incident: a
+# misclassified robotics command armed one in a repo with no document history).
+SLUGLESS_EXPIRE_AFTER = 7 * 24 * 3600
 EVIDENCE_LOG = "stage-evidence.log"
 PILOT_STAGES = ("1", "2", "3", "4", "5", "6")  # intake..verify (docs-pilot Steps 1-6)
+
+
+def expire_stale_slugless(root: str):
+    """G7: remove a slugless root sentinel past SLUGLESS_EXPIRE_AFTER and return
+    a one-time final notice (None otherwise). An unparseable armed_at counts as
+    expired — a corrupt slugless sentinel is pure noise. Fail-open: if removal
+    fails, stay silent and retry at the next Stop."""
+    path = os.path.join(root, SENTINEL)
+    if not os.path.isfile(path):
+        return None
+    try:
+        armed = float(json.load(open(path)).get("armed_at", 0) or 0)
+    except Exception:
+        armed = 0.0
+    if time.time() - armed <= SLUGLESS_EXPIRE_AFTER:
+        return None
+    try:
+        os.remove(path)
+    except OSError:
+        return None
+    days = int(SLUGLESS_EXPIRE_AFTER // 86400)
+    return (
+        f"[OMD verify-pending] slug 없는 verify-pending 센티널이 {days}일 넘게 남아 있어 "
+        "자동 만료·제거했습니다 (마지막 고지 — 대응 문서 워크스페이스 없음)."
+    )
 
 
 def pending_sentinels(root: str):
@@ -92,9 +123,12 @@ def main() -> int:
         if payload.get("stop_hook_active"):
             return 0  # G1-chk: never re-fire inside a stop-hook continuation
         root = os.path.join(payload.get("cwd") or os.getcwd(), ".omd")
+        expiry_notice = expire_stale_slugless(root)  # G7: before listing pendings
         items = pending_sentinels(root)
         gaps = stage_evidence_gaps(root)
         blocks = []
+        if expiry_notice:
+            blocks.append(expiry_notice)
         if items:
             blocks.append(build_message(items))
         if gaps:

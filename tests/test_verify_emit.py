@@ -432,3 +432,25 @@ def test_hyphenated_pytest_like_build_script_still_arms(tmp_path):
     out = run_hook("python3 scripts/pytest-utils-report-deck.py output.pptx", cwd=str(tmp_path))
     assert "document-integrity" in out
     assert (tmp_path / ".omd" / ".verify-pending").is_file()
+
+
+# Recovered verbatim from vault session 4f56a5f0 (2026-07-15): a robotics
+# deploy+test pipeline whose `python3 -m pytest ... test_obs_builder.py` segment
+# matched RUN_SCRIPT_RE via the "build" substring of "obs_builder" and planted a
+# never-cleared slugless sentinel in a workspace with no document history.
+# Distinct from the oh-my-scholar incident above: multi-line compound command,
+# ssh + docker exec wrapping, and a doc keyword hit inside a NON-test-prefixed
+# word ("obs_builder") — only the standalone pytest token saves it.
+VAULT_INCIDENT_CMD = """cat /Users/kimseungmin/.claude/jobs/4f56a5f0/tmp/frames_new.py | ssh ksm-ubuntu "docker exec -i stonefish_dev bash -c 'cat > /workspace/src/stonefish_sim/albc_bridge/albc_bridge/frames.py'" 2>/dev/null
+cat /Users/kimseungmin/.claude/jobs/4f56a5f0/tmp/test_frames_new.py | ssh ksm-ubuntu "docker exec -i stonefish_dev bash -c 'cat > /workspace/src/stonefish_sim/albc_bridge/test/test_frames.py'" 2>/dev/null
+ssh ksm-ubuntu 'docker exec stonefish_dev bash -lc "source /opt/ros/humble/setup.bash; source /workspace/install/setup.bash 2>/dev/null; cd /workspace && colcon build --packages-select albc_bridge --merge-install >/tmp/build.log 2>&1 && echo BUILD_OK || (echo BUILD_FAIL; tail -15 /tmp/build.log); source install/setup.bash; echo ===TESTS===; python3 -m pytest src/stonefish_sim/albc_bridge/test/test_frames.py src/stonefish_sim/albc_bridge/test/test_obs_builder.py -q 2>&1 | tail -20"' 2>&1 | grep -v -iE 'tailscale|attest|node key'"""
+
+
+def test_remote_deploy_pytest_pipeline_stays_silent(tmp_path):
+    """2026-07-15 vault incident verbatim: remote pytest over a *_builder.py test
+    file is not a doc build — silent, nothing armed."""
+    assert not is_doc_build(VAULT_INCIDENT_CMD)
+    (tmp_path / ".omd").mkdir()
+    out = run_hook(VAULT_INCIDENT_CMD, cwd=str(tmp_path))
+    assert out.strip() == ""
+    assert not (tmp_path / ".omd" / ".verify-pending").exists()

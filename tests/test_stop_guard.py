@@ -132,3 +132,47 @@ def test_stage_evidence_old_log_ignored(tmp_path):
     proc = run_hook({"cwd": str(tmp_path)})
     assert proc.returncode == 0
     assert "stage-evidence" not in proc.stdout
+
+
+# ── G7: slugless sentinel self-expiry (2026-07-15 vault incident) ────────────
+# A slugless root sentinel names no .omd/<slug>/ workspace, so in a workspace
+# that never runs verify signals nothing ever clears it — without a TTL the
+# guard repeats "(slug unknown)" at every Stop forever. Slugged sentinels mark
+# real carried-over work (HK-4) and must never expire.
+
+def test_slugless_sentinel_expires_after_ttl(tmp_path):
+    """9) G7: a slugless root sentinel older than SLUGLESS_EXPIRE_AFTER is
+    removed with one final notice; the following Stop is silent."""
+    root = tmp_path / ".omd"
+    write_sentinel(root, "", time.time() - 8 * 24 * 3600)
+    proc = run_hook({"cwd": str(tmp_path)})
+    assert proc.returncode == 0
+    message = json.loads(proc.stdout)["systemMessage"]  # stdout is \u-escaped JSON
+    assert "만료" in message
+    assert "(slug unknown)" not in message
+    assert not (root / ".verify-pending").exists()
+    proc2 = run_hook({"cwd": str(tmp_path)})
+    assert proc2.returncode == 0
+    assert proc2.stdout.strip() == ""
+
+
+def test_slugless_sentinel_fresh_keeps_normal_advisory(tmp_path):
+    """10) a slugless sentinel younger than the TTL keeps the normal advisory
+    (stale-tagged after 6h, but not expired)."""
+    root = tmp_path / ".omd"
+    write_sentinel(root, "", time.time() - 7 * 3600)
+    proc = run_hook({"cwd": str(tmp_path)})
+    assert proc.returncode == 0
+    assert "(slug unknown)" in proc.stdout
+    assert (root / ".verify-pending").is_file()
+
+
+def test_slugged_sentinel_never_self_expires(tmp_path):
+    """11) slugged sentinels mark real carried-over work (HK-4) — no TTL,
+    however old."""
+    root = tmp_path / ".omd"
+    write_sentinel(root, "mydeck", time.time() - 30 * 24 * 3600)
+    proc = run_hook({"cwd": str(tmp_path)})
+    assert proc.returncode == 0
+    assert "mydeck" in proc.stdout
+    assert (root / "mydeck" / ".verify-pending").is_file()

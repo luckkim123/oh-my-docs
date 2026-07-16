@@ -15,6 +15,26 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-07-16
+
+### Fixed
+
+- **docs_stop_guard: slugless sentinels self-expire after 7 days** (2026-07-15 vault
+  incident, second instance of the v0.5.1 false-positive class: a robotics deploy+test
+  pipeline — `python3 -m pytest ... test_obs_builder.py` over ssh/docker — matched "build"
+  inside "obs_builder", armed a top-level `.verify-pending` in a workspace with no document
+  history, and the Stop guard re-warned "(slug unknown)" at every session Stop with no
+  expiry path). A slugless root sentinel names no `.omd/<slug>/` workspace, so nothing ever
+  resolves it where verify signals never run: past `SLUGLESS_EXPIRE_AFTER` (7 days) it is
+  now removed with one final notice. Slugged sentinels keep HK-4 semantics — real
+  carried-over work never expires. This also auto-cleans sentinels already planted in
+  foreign repos before the v0.5.1 arm guard shipped (they predate the fix on every machine).
+  3 tests (expiry + fresh-slugless boundary + slugged-never-expires).
+- **Vault incident command pinned verbatim as a regression test**: the multi-line
+  ssh + docker exec pipeline exercises a distinct path from the v0.5.1 oh-my-scholar
+  incident — a doc keyword inside a non-`test_`-prefixed word ("obs_builder"), where only
+  the standalone-token pytest exclusion prevents the match.
+
 ## [0.5.2] - 2026-07-16
 
 ### Fixed
