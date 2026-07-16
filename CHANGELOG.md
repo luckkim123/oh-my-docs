@@ -15,6 +15,21 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-07-16
+
+### Fixed
+
+- **route_emit's SSOT-gate wiki category list matched to code** (2026-07-16 om* wiki audit
+  finding): the per-turn injected `.omd/wiki/(convention·technique·pattern)` parenthetical
+  named a category that does not exist anywhere (`technique`) and omitted the real
+  `decision`/`reference` — every session was pointed at a nonexistent directory and never told
+  about two real ones, silently weakening the SSOT-first gate the hook exists to enforce. Fixed
+  to `(convention·pattern·decision·reference)`; a new locking test binds the hook prose to
+  `references/wiki/lint_wiki.py` CATEGORIES so the two can never drift apart again — the live
+  instance of the "hook prose restates a code fact with no test binding them" failure class.
+- **TEST_RUN_RE standalone-token guard** (v0.5.1 verifier finding, committed post-release)
+  ships in this release.
+
 ## [0.5.1] - 2026-07-16
 
 ### Fixed
