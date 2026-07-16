@@ -162,6 +162,26 @@ def test_ssot_gate_forbids_direction_before_recon():
     assert "백지" in out  # 지형 미파악 방향 제시 → 백지 재시작
 
 
+def test_wiki_category_list_matches_lint_categories():
+    """⑪ SSOT 게이트 괄호의 wiki 카테고리 목록은 lint_wiki.CATEGORIES 와 문자 그대로
+    동기 — 코드 상수가 유일한 진실이고 훅 prose 는 그 복사본이다.
+
+    Origin: 2026-07-16 om* wiki 감사. 매 턴 주입되던 괄호가 존재하지 않는
+    'technique' 를 SSOT 카테고리로 안내하고 실존하는 decision/reference 는
+    누락하고 있었다 — 훅 prose 와 코드 상수를 잇는 테스트가 없어 생긴
+    프로즈-코드 드리프트의 라이브 사례."""
+    import importlib.util
+    import re
+    lint_path = Path(__file__).parent.parent / "references" / "wiki" / "lint_wiki.py"
+    spec = importlib.util.spec_from_file_location("omd_lint_wiki_route_sync", str(lint_path))
+    lint_wiki = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lint_wiki)
+    out = context_of(run_hook({"prompt": "발표자료 양식"}))
+    m = re.search(r"\.omd/wiki/\(([^)]*)\)", out)
+    assert m, "the SSOT gate must name .omd/wiki/(...) with its category list"
+    assert set(m.group(1).split("·")) == set(lint_wiki.CATEGORIES)
+
+
 def test_repo_docs_in_stage_token_line():
     """R2: repo-docs 장르가 FORMAT 슬롯(STAGE 토큰 줄)에 광고돼야 — 카드 실재와 동기."""
     out = context_of(run_hook({"prompt": "README 만들어줘"}))

@@ -34,7 +34,7 @@ CHECKPOINT = (
     "한 줄 근거에 `--consensus` 발동 여부를 밝혀라.\n"
     "⚠️ 지식 SSOT 우선(첫 생성·방향 제시 전 필독): 디자인 시스템·양식·문체·빌드 규칙·주석 기법 등 "
     "'이 산출물은 어떻게 만드나'를 묻거나 판단해야 하면, 소스·일반 관행·내 기억보다 먼저 이 프로젝트의 "
-    ".omd/wiki/(convention·technique·pattern) 를 SSOT 로 읽어라. wiki 에 답이 있는데 즉흥적으로 "
+    ".omd/wiki/(convention·pattern·decision·reference) 를 SSOT 로 읽어라. wiki 에 답이 있는데 즉흥적으로 "
     "스타일을 정하는 것은 결함이다. 그리고 .omd/<slug>/ 존재를 확인하라 — 있으면 이 산출물은 "
     "진행 중(build·versions·renders·content.json)이니 기존 build 파이프라인·템플릿을 재사용하라. "
     "빈 Presentation()/백지에서 새로 짜는 것은 금지. 이 확인 전에는 '이렇게 개선하겠다'는 "
