@@ -93,8 +93,10 @@ actionable finding is archived in the wiki yet silently dropped before the next 
   `needs-revision-old`). When
   `python3` is available, `references/wiki/lint_wiki.py` also surfaces each as an `open-revision`
   warning, and flags a mistyped value as `unknown-status` (a typo would silently leave the
-  enumeration). The on-disk `status:`/`blocked-on:` keys are identical across every om* harness, so
-  the grep is family-wide.
+  enumeration). The on-disk `status:`/`blocked-on:` key names are identical across every om* harness
+  (the value vocabulary is per-harness: omx `needs-experiment`/`needs-apply-before-retrain`/
+  `resolved`, omd `needs-revision`/`resolved`, oms `open-gap`/`resolved`), so the
+  key-anchored grep shape is family-wide.
 - **Carry-forward boundary**: `docs-verify` and `docs-learn` run this enumeration before a build /
   style-promotion and name any open `needs-revision` note as a warning finding — so a measured
   correction cannot be built over unknowingly. WARN only (omd never hard-gates on the wiki).

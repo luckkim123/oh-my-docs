@@ -45,9 +45,15 @@ BUILD_SIGNALS = (
 # run whose name hints at document building (build/deck/slide/doc/pptx/docx/xlsx/hwpx/present),
 # so an unrelated `python3 analyze_runs.py` does NOT trigger (noise control).
 RUN_SCRIPT_RE = re.compile(
-    r"\bpython3?\b[^\n|&;]*\b\w*(build|deck|slide|doc|pptx|docx|xlsx|hwpx|present)\w*\.py\b",
+    r"\bpython3?\b[^\n|&;]*\b(\w*(?:build|deck|slide|doc|pptx|docx|xlsx|hwpx|present)\w*\.py)\b",
     re.IGNORECASE,
 )
+# v0.5.1: test runs are never deliverable builds. `pytest tests/test_wiki_spec_docs.py`
+# matched the doc-keyword heuristic above ("doc" in the TEST file name), armed a
+# .verify-pending in a foreign repo, and the Stop guard re-warned every turn
+# (2026-07-16 false-positive). Word-level pytest/unittest kills the whole check;
+# a directly-run test_*.py / *_test.py script is filtered on the captured name.
+TEST_RUN_RE = re.compile(r"\b(?:pytest|unittest)\b")
 
 # G1: verify-pending sentinel handshake — armed on build, cleared on a
 # verify-signal command, enforced (advisory) by hooks/docs_stop_guard.py at Stop.
@@ -110,6 +116,11 @@ def _write_sentinel(path, head):
 
 
 def arm_sentinel(root, command):
+    # v0.5.1 noise control: only an existing .omd/ project can be armed — never
+    # fabricate .omd/ in a repo the pipeline has not touched. Mirrors
+    # handle_md_edit's "no slug context -> not an omd artifact" rule.
+    if not os.path.isdir(root):
+        return
     _write_sentinel(_sentinel_path(root, command), command)
 
 
@@ -140,8 +151,12 @@ def is_doc_build(command: str) -> bool:
     (`python3 analyze_runs.py`) match neither and stay silent (noise control)."""
     if not command:
         return False
+    if TEST_RUN_RE.search(command):
+        return False  # test runs never build a deliverable (v0.5.1)
     has_signal = any(sig in command for sig in BUILD_SIGNALS)
-    runs_doc_script = bool(RUN_SCRIPT_RE.search(command))
+    m = RUN_SCRIPT_RE.search(command)
+    name = m.group(1).lower() if m else ""
+    runs_doc_script = bool(m) and not (name.startswith("test_") or name.endswith("_test.py"))
     return has_signal or runs_doc_script
 
 

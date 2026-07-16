@@ -15,6 +15,29 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-07-16
+
+### Fixed
+
+- **docs_verify_emit no longer mistakes test runs for document builds, and never
+  fabricates `.omd/` outside an omd project** (2026-07-16 false-positive: a sibling
+  harness's `pytest tests/test_wiki_spec_docs.py` run matched the doc-keyword script
+  heuristic — "doc" inside a TEST filename — and armed a top-level `.verify-pending`
+  in a foreign repo whose `.omd/` the hook itself created; the Stop guard then
+  re-warned "(slug unknown)" every turn until manual cleanup). Two guards: a
+  word-level `pytest`/`unittest` exclusion plus a `test_*`/`*_test.py` filename
+  filter on the captured script name, and `arm_sentinel` now requires an existing
+  `.omd/` root (mirrors handle_md_edit's no-slug-context rule). The integrity
+  reminder itself still fires for genuine build commands outside a project — only
+  the persistent sentinel is scoped. 3 regression tests (incident command verbatim);
+  6 existing arm/clear/cooldown tests updated to pre-create `.omd/` per the new contract.
+- `references/wiki/lint_wiki.py` docstring now records WHY two omx lint checks were
+  not ported (`contradiction-candidate`, `low-confidence`/`low-quality` — omd notes
+  carry neither tags nor quality_score), previously an undocumented divergence.
+- `references/wiki/README.md`: "identical across every om* harness" precision — the
+  `status:`/`blocked-on:` key NAMES are family-wide, the value vocabulary is
+  per-harness (omx/omd/oms listed explicitly).
+
 ## [0.5.0] - 2026-07-14
 
 ### Added

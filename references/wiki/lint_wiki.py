@@ -6,6 +6,9 @@ so frontmatter is never required — only the optional `confidence:` marker is
 inspected, staleness keys on file mtime, and the orphan check fires only when the
 store actually uses [[wikilinks]] (a link-less store would false-flag every note).
 Near-duplicate = filename-token Jaccard >= 0.5 (omx-measured threshold, borrowed).
+Omx checks NOT ported, deliberately: `contradiction-candidate` (keys on omx's
+tag vocabulary) and `low-confidence`/`low-quality` (key on a confidence enum +
+quality_score) — omd notes carry neither field, so the checks cannot apply.
 NEVER gates: exit code is always 0 — docs-learn reads the report, a human decides.
 """
 import argparse

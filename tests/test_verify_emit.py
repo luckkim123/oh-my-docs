@@ -138,6 +138,7 @@ def test_dead_doc_exts_removed():
 
 def test_arm_writes_slug_sentinel(tmp_path):
     """a) build 명령 + command에 outputs/mydeck/ 경로 포함 → .omd/mydeck/.verify-pending 생성."""
+    (tmp_path / ".omd").mkdir()  # v0.5.1: arm requires an existing .omd/ project
     run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
     sentinel = tmp_path / ".omd" / "mydeck" / ".verify-pending"
     assert sentinel.is_file()
@@ -145,6 +146,7 @@ def test_arm_writes_slug_sentinel(tmp_path):
 
 def test_arm_writes_global_sentinel_when_slug_unknown(tmp_path):
     """b) build 명령 + slug 단서 없음 → .omd/.verify-pending 생성."""
+    (tmp_path / ".omd").mkdir()
     run_hook("python3 build_deck.py", cwd=str(tmp_path))
     sentinel = tmp_path / ".omd" / ".verify-pending"
     assert sentinel.is_file()
@@ -154,6 +156,7 @@ def test_arm_writes_global_sentinel_when_slug_unknown(tmp_path):
 
 def test_clear_removes_all_sentinels_and_stays_silent(tmp_path):
     """c) pdftoppm 명령 → 기존 센티널 전부 제거, 리마인더 미발화."""
+    (tmp_path / ".omd").mkdir()
     run_hook("python3 build_deck.py", cwd=str(tmp_path))
     run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
     assert (tmp_path / ".omd" / ".verify-pending").is_file()
@@ -166,6 +169,7 @@ def test_clear_removes_all_sentinels_and_stays_silent(tmp_path):
 
 
 def test_clear_via_unzip_test_signal(tmp_path):
+    (tmp_path / ".omd").mkdir()
     run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
     sentinel = tmp_path / ".omd" / "mydeck" / ".verify-pending"
     assert sentinel.is_file()
@@ -176,6 +180,7 @@ def test_clear_via_unzip_test_signal(tmp_path):
 
 def test_sentinel_content_has_armed_at_and_command_head(tmp_path):
     """d) 센티널 내용은 json이고 armed_at(epoch float)·command_head(str) 키 보유."""
+    (tmp_path / ".omd").mkdir()
     run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
     sentinel = tmp_path / ".omd" / "mydeck" / ".verify-pending"
     data = json.loads(sentinel.read_text())
@@ -204,6 +209,7 @@ def test_arm_fail_open_when_omd_uncreatable(tmp_path):
 def test_cooldown_suppresses_repeat_reminder_but_keeps_sentinel_arm(tmp_path):
     """f) 같은 build 명령 2회 연속 → 1회차 리마인더 발화 + throttle 파일 생성,
     2회차 출력 없음(단 센티널은 2회차에도 갱신 arm — 쿨다운은 메시지만 침묵)."""
+    (tmp_path / ".omd").mkdir()
     out1 = run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
     assert out1.strip() != ""
     throttle = tmp_path / ".omd" / ".hook-throttle.json"
@@ -388,3 +394,32 @@ def test_md_reminder_names_site_gate(tmp_path, monkeypatch):
     slug = _with_slug(tmp_path)
     out = run_md_hook(f"outputs/{slug}/current/docs/index.md", cwd=str(tmp_path))
     assert "site" in out and "mkdocs build --strict" in out
+
+
+# ── v0.5.1: 테스트 실행 오인·.omd 날조 회귀 고정 (2026-07-16 false-positive) ──
+
+def test_pytest_run_with_doc_named_test_file_stays_silent(tmp_path):
+    """pytest 대상 파일명에 'docs'가 있어도(빌드 아님) 침묵 + arm 없음 —
+    2026-07-16 오탐 재현 커맨드 그대로."""
+    (tmp_path / ".omd").mkdir()
+    out = run_hook(
+        "cd /root/oh-my-scholar && python3 -m pytest tests/test_scholar_verify_skill.py "
+        "tests/test_wiki_spec_docs.py -q", cwd=str(tmp_path))
+    assert out.strip() == ""
+    assert not (tmp_path / ".omd" / ".verify-pending").exists()
+
+
+def test_directly_run_test_script_stays_silent(tmp_path):
+    """python3 test_doc_render.py — 직접 실행이라도 test_* 스크립트는 빌드가 아님."""
+    (tmp_path / ".omd").mkdir()
+    out = run_hook("python3 test_doc_render.py", cwd=str(tmp_path))
+    assert out.strip() == ""
+    assert not (tmp_path / ".omd" / ".verify-pending").exists()
+
+
+def test_arm_never_fabricates_omd_root(tmp_path):
+    """omd 프로젝트가 아닌 곳(.omd/ 부재)에서는 빌드 명령이라도 .omd/를 만들지 않는다.
+    리마인더 자체는 발화(무결성 안내는 프로젝트 무관)."""
+    out = run_hook("python3 build_deck.py", cwd=str(tmp_path))
+    assert "document-integrity" in out
+    assert not (tmp_path / ".omd").exists()
