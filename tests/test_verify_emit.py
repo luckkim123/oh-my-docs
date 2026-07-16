@@ -423,3 +423,12 @@ def test_arm_never_fabricates_omd_root(tmp_path):
     out = run_hook("python3 build_deck.py", cwd=str(tmp_path))
     assert "document-integrity" in out
     assert not (tmp_path / ".omd").exists()
+
+
+def test_hyphenated_pytest_like_build_script_still_arms(tmp_path):
+    """'pytest'가 하이픈 파일명의 부분 문자열일 뿐이면 테스트 실행이 아니다 —
+    진짜 빌드 스크립트는 여전히 arm (verifier finding 2026-07-16)."""
+    (tmp_path / ".omd").mkdir()
+    out = run_hook("python3 scripts/pytest-utils-report-deck.py output.pptx", cwd=str(tmp_path))
+    assert "document-integrity" in out
+    assert (tmp_path / ".omd" / ".verify-pending").is_file()

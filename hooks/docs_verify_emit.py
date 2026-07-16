@@ -53,7 +53,10 @@ RUN_SCRIPT_RE = re.compile(
 # .verify-pending in a foreign repo, and the Stop guard re-warned every turn
 # (2026-07-16 false-positive). Word-level pytest/unittest kills the whole check;
 # a directly-run test_*.py / *_test.py script is filtered on the captured name.
-TEST_RUN_RE = re.compile(r"\b(?:pytest|unittest)\b")
+# Token must stand alone as a command word — bare \b would also match "pytest"
+# inside a hyphenated build-script name like pytest-utils-report.py (verifier
+# finding, 2026-07-16) and silence a genuine build.
+TEST_RUN_RE = re.compile(r"(?:^|[\s;|&])(?:pytest|unittest)(?:[\s;|&]|$)")
 
 # G1: verify-pending sentinel handshake — armed on build, cleared on a
 # verify-signal command, enforced (advisory) by hooks/docs_stop_guard.py at Stop.
