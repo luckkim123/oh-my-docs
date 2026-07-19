@@ -20,6 +20,8 @@ import sys
 import time
 from pathlib import Path
 
+from hooks.docs_stop_guard import expire_stale_slugless
+
 HOOK = Path(__file__).parent.parent / "hooks" / "docs_stop_guard.py"
 
 
@@ -165,6 +167,22 @@ def test_slugless_sentinel_fresh_keeps_normal_advisory(tmp_path):
     assert proc.returncode == 0
     assert "(slug unknown)" in proc.stdout
     assert (root / ".verify-pending").is_file()
+
+
+def test_expire_stale_slugless_corrupt_json_treated_as_expired(tmp_path):
+    """12) a slugless sentinel with unparseable JSON falls back to
+    armed_at=0.0 (lines 38-39) -- always older than the TTL, so it is treated
+    as expired and removed with a one-time Korean notice instead of raising
+    or silently sticking around to nag forever (2026-07-15 vault incident
+    failure class: corrupt sentinel data)."""
+    root = tmp_path / ".omd"
+    root.mkdir()
+    sentinel = root / ".verify-pending"
+    sentinel.write_text("{not valid json")
+    notice = expire_stale_slugless(str(root))
+    assert notice is not None
+    assert "만료" in notice
+    assert not sentinel.exists()
 
 
 def test_slugged_sentinel_never_self_expires(tmp_path):

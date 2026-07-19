@@ -19,6 +19,8 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+import pytest
+
 from hooks.docs_verify_emit import is_doc_build
 import hooks.docs_verify_emit as mod
 
@@ -202,6 +204,24 @@ def test_arm_fail_open_when_omd_uncreatable(tmp_path):
         capture_output=True, text=True,
     )
     assert proc.returncode == 0, f"hook exited {proc.returncode}: {proc.stderr}"
+
+
+@pytest.mark.skipif(hasattr(os, "geteuid") and os.geteuid() == 0,
+                     reason="chmod cannot block root")
+def test_arm_write_failure_still_fires_reminder_no_half_sentinel(tmp_path):
+    """e2) arm_sentinel()'s own write failing (mkstemp/replace error, e.g. disk
+    full or permission) must fail open — the build reminder still fires
+    (main()'s except around arm_sentinel, lines 294-295) AND no half-written
+    sentinel is left behind for the Stop guard to trip over."""
+    omd = tmp_path / ".omd"
+    omd.mkdir()
+    os.chmod(omd, 0o555)  # read+exec only: mkstemp() cannot create a tmp file here
+    try:
+        out = run_hook("python3 build_deck.py", cwd=str(tmp_path))
+    finally:
+        os.chmod(omd, 0o755)
+    assert "document-integrity" in out
+    assert not (omd / ".verify-pending").exists()
 
 
 # ── HG-3: 리마인더 content-hash 쿨다운 ───────────────────────────────
