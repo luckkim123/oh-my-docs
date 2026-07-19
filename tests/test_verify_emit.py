@@ -21,8 +21,8 @@ from typing import Optional
 
 import pytest
 
-from hooks.docs_verify_emit import is_doc_build
 import hooks.docs_verify_emit as mod
+from hooks.docs_verify_emit import is_doc_build
 
 HOOK = Path(__file__).parent.parent / "hooks" / "docs_verify_emit.py"
 

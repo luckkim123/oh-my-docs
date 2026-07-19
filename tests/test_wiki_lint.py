@@ -19,9 +19,12 @@ def build_store(root):
     one broken-ref, one near-dup pair, one misplaced file, one unknown dir."""
     conv = os.path.join(root, "convention")
     dec = os.path.join(root, "decision")
-    os.makedirs(conv); os.makedirs(dec)
+    os.makedirs(conv)
+    os.makedirs(dec)
     os.makedirs(os.path.join(root, "scratch"))          # unknown-category
-    w = lambda p, s: open(p, "w", encoding="utf-8").write(s)
+
+    def w(p, s):
+        open(p, "w", encoding="utf-8").write(s)
     w(os.path.join(root, "loose.md"), "misplaced\n")     # misplaced
     w(os.path.join(conv, "lab-style-spec.md"),
       "---\nconfidence: high\n---\n# lab style\ncaption 12pt, see [[defense-defect-patterns]]\n")
@@ -49,7 +52,8 @@ class TestScan(unittest.TestCase):
 
     def test_orphan_only_with_link_culture(self):
         with tempfile.TemporaryDirectory() as tmp:
-            conv = os.path.join(tmp, "convention"); os.makedirs(conv)
+            conv = os.path.join(tmp, "convention")
+            os.makedirs(conv)
             open(os.path.join(conv, "solo-note.md"), "w").write("no links anywhere\n")
             old = time.mktime(time.strptime("2026-01-01", "%Y-%m-%d"))
             os.utime(os.path.join(conv, "solo-note.md"), (old, old))
@@ -79,7 +83,8 @@ class TestActionableStatus(unittest.TestCase):
 
     def _scan_one(self, body):
         with tempfile.TemporaryDirectory() as tmp:
-            conv = os.path.join(tmp, "convention"); os.makedirs(conv)
+            conv = os.path.join(tmp, "convention")
+            os.makedirs(conv)
             open(os.path.join(conv, "n.md"), "w", encoding="utf-8").write(body)
             return {t for _, t, _, _ in lint_wiki.scan(tmp, now=NOW)}
 
