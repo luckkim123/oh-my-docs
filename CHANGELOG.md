@@ -15,6 +15,23 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-07-19
+
+### Fixed
+
+- **Hook filename collision with sibling plugin** (audit finding): `hooks/route_emit.py`,
+  `hooks/model_guard.py`, and `hooks/precompact_reinject.py` shared a bare basename with
+  hooks of the same name in the sibling `oh-my-heroacademia` plugin, making traces ambiguous
+  when both plugins are loaded. Renamed to `docs_route_emit.py`, `docs_model_guard.py`, and
+  `docs_precompact_reinject.py` to match the `docs_` convention already used by
+  `docs_stop_guard.py`/`docs_verify_emit.py`. Updated `.claude-plugin/plugin.json`, the three
+  corresponding test files, and the README hooks/ layout diagram.
+
+### Added
+
+- **CI workflow** (`.github/workflows/ci.yml`): runs the test suite on push to `main` and on
+  pull requests via `actions/checkout@v4` + `actions/setup-python@v5` (3.11) + `pytest`.
+
 ## [0.5.3] - 2026-07-16
 
 ### Fixed
