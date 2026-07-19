@@ -1,0 +1,13 @@
+# Conservative lint-only config: correctness + import hygiene, no style opinions.
+# line-length matches this repo's existing longest-common line style (not a reformat target).
+target-version = "py311"
+line-length = 120
+
+[lint]
+select = [
+    "E4",  # import formatting
+    "E7",  # statement structure (e.g. comparisons, bare except)
+    "E9",  # runtime errors (syntax, undefined names)
+    "F",   # pyflakes (unused imports/vars, undefined names, etc.)
+    "I",   # isort (import sorting)
+]

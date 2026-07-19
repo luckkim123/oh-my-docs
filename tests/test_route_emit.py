@@ -80,7 +80,7 @@ def test_context_lists_formats():
     xlsx 는 references/formats/xlsx.md 카드(openpyxl/xlsxwriter 라우팅, <v>0</v> 함정,
     구조검증 게이트)가 실재하므로 포맷 목록에 포함돼야 한다 (2026-05-31 신설)."""
     out = context_of(run_hook({"prompt": "발표자료"}))
-    stage_lines = [l for l in out.splitlines() if l.startswith("STAGE(docs)")]
+    stage_lines = [line for line in out.splitlines() if line.startswith("STAGE(docs)")]
     assert stage_lines, "STAGE token line must exist"
     for fmt in ("pptx", "docx", "xlsx", "hwpx", "repo-docs", "site"):
         assert fmt in stage_lines[0], f"format '{fmt}' missing from STAGE token line"
@@ -103,7 +103,7 @@ def test_context_states_consensus_rationale():
 def test_pdf_is_not_a_generation_format():
     """H5 결정: pdf는 입력·변환 층위 — FORMAT/STAGE 슬롯에 절대 편입 금지."""
     out = context_of(run_hook({"prompt": "이 PDF로 발표자료 만들어줘"}))
-    stage_lines = [l for l in out.splitlines() if l.startswith("STAGE(docs)")]
+    stage_lines = [line for line in out.splitlines() if line.startswith("STAGE(docs)")]
     assert stage_lines, "STAGE token line must exist"
     assert "pdf" not in stage_lines[0]          # STAGE 토큰 줄에 pdf 없음
     assert "입력·변환 층위" in out                 # 층위 표기는 존재
@@ -185,7 +185,7 @@ def test_wiki_category_list_matches_lint_categories():
 def test_repo_docs_in_stage_token_line():
     """R2: repo-docs 장르가 FORMAT 슬롯(STAGE 토큰 줄)에 광고돼야 — 카드 실재와 동기."""
     out = context_of(run_hook({"prompt": "README 만들어줘"}))
-    stage_lines = [l for l in out.splitlines() if l.startswith("STAGE(docs)")]
+    stage_lines = [line for line in out.splitlines() if line.startswith("STAGE(docs)")]
     assert stage_lines and "repo-docs" in stage_lines[0]
 
 
@@ -194,5 +194,5 @@ def test_site_advertised_with_card():
     card = Path(__file__).parent.parent / "references" / "formats" / "site.md"
     assert card.is_file(), "advertising requires the card to exist (H1-isomorphic rule)"
     out = context_of(run_hook({"prompt": "문서 사이트 만들어줘"}))
-    stage_lines = [l for l in out.splitlines() if l.startswith("STAGE(docs)")]
+    stage_lines = [line for line in out.splitlines() if line.startswith("STAGE(docs)")]
     assert stage_lines and "site" in stage_lines[0]

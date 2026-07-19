@@ -9,8 +9,8 @@ agents/doc-verifier.md Integrity gate rows (zip CRC / dangling rels / orphan mas
 import fnmatch
 import posixpath
 import re
-import zipfile
 import xml.etree.ElementTree as ET
+import zipfile
 from collections import Counter
 
 RID_ATTR_RE = re.compile(r'r:(?:embed|link|id)="(rId\d+)"')
