@@ -441,9 +441,9 @@ def test_hyphenated_pytest_like_build_script_still_arms(tmp_path):
 # Distinct from the oh-my-scholar incident above: multi-line compound command,
 # ssh + docker exec wrapping, and a doc keyword hit inside a NON-test-prefixed
 # word ("obs_builder") — only the standalone pytest token saves it.
-VAULT_INCIDENT_CMD = """cat /Users/kimseungmin/.claude/jobs/4f56a5f0/tmp/frames_new.py | ssh ksm-ubuntu "docker exec -i stonefish_dev bash -c 'cat > /workspace/src/stonefish_sim/albc_bridge/albc_bridge/frames.py'" 2>/dev/null
-cat /Users/kimseungmin/.claude/jobs/4f56a5f0/tmp/test_frames_new.py | ssh ksm-ubuntu "docker exec -i stonefish_dev bash -c 'cat > /workspace/src/stonefish_sim/albc_bridge/test/test_frames.py'" 2>/dev/null
-ssh ksm-ubuntu 'docker exec stonefish_dev bash -lc "source /opt/ros/humble/setup.bash; source /workspace/install/setup.bash 2>/dev/null; cd /workspace && colcon build --packages-select albc_bridge --merge-install >/tmp/build.log 2>&1 && echo BUILD_OK || (echo BUILD_FAIL; tail -15 /tmp/build.log); source install/setup.bash; echo ===TESTS===; python3 -m pytest src/stonefish_sim/albc_bridge/test/test_frames.py src/stonefish_sim/albc_bridge/test/test_obs_builder.py -q 2>&1 | tail -20"' 2>&1 | grep -v -iE 'tailscale|attest|node key'"""
+VAULT_INCIDENT_CMD = """cat /Users/<you>/.claude/jobs/<id>/tmp/frames_new.py | ssh <remote-host> "docker exec -i <container> bash -c 'cat > /workspace/src/<sim_pkg>/<bridge_pkg>/<bridge_pkg>/frames.py'" 2>/dev/null
+cat /Users/<you>/.claude/jobs/<id>/tmp/test_frames_new.py | ssh <remote-host> "docker exec -i <container> bash -c 'cat > /workspace/src/<sim_pkg>/<bridge_pkg>/test/test_frames.py'" 2>/dev/null
+ssh <remote-host> 'docker exec <container> bash -lc "source /opt/ros/humble/setup.bash; source /workspace/install/setup.bash 2>/dev/null; cd /workspace && colcon build --packages-select <bridge_pkg> --merge-install >/tmp/build.log 2>&1 && echo BUILD_OK || (echo BUILD_FAIL; tail -15 /tmp/build.log); source install/setup.bash; echo ===TESTS===; python3 -m pytest src/<sim_pkg>/<bridge_pkg>/test/test_frames.py src/<sim_pkg>/<bridge_pkg>/test/test_obs_builder.py -q 2>&1 | tail -20"' 2>&1 | grep -v -iE 'tailscale|attest|node key'"""
 
 
 def test_remote_deploy_pytest_pipeline_stays_silent(tmp_path):
