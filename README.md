@@ -12,8 +12,18 @@ Multi-agent orchestration harness specialized for document work (pptx/docx/xlsx/
 
 ## Install
 
-A Claude Code plugin (`.claude-plugin/plugin.json`) — install it the way your Claude Code
-setup adds plugins. It runs standalone; no other harness is required.
+A Claude Code plugin (`.claude-plugin/plugin.json`) — it runs standalone; no other harness
+is required. This repo ships only the plugin manifest, no `marketplace.json`, so
+`/plugin marketplace add` doesn't apply here; load it directly with `--plugin-dir`:
+
+```sh
+git clone https://github.com/luckkim123/oh-my-docs.git
+claude --plugin-dir ./oh-my-docs
+```
+
+Requires Claude Code with plugin support (`.claude-plugin/plugin.json`, `--plugin-dir`,
+`/plugin`) and Python 3.11+ (CI-tested floor; `python-hwpx` itself requires 3.10+, see
+`references/formats/hwpx.md`).
 
 Prerequisites — the Python/native tools the format cards drive:
 
@@ -91,7 +101,8 @@ references/   formats/ (pptx, docx, xlsx, hwpx, pdf, repo-docs, site) · rubrics
               output-layout.md · learning-protocol.md
 hooks/        docs_route_emit.py (UserPromptSubmit routing) · docs_verify_emit.py
               (PostToolUse verify reminder, Bash + Edit|Write) · docs_stop_guard.py ·
-              docs_model_guard.py
+              docs_model_guard.py · docs_precompact_reinject.py (PreCompact notepad prune /
+              SessionStart(compact) reinject)
 ```
 
 Two-level wiki (local `.omd/wiki/` + global ascent, `references/wiki/README.md`) lets each
