@@ -37,3 +37,6 @@ in the report (builder: Build Notes; verifier: Verification Report), then either
 re-verify the claim live or proceed with the honest UNVERIFIED label. Never silently
 trust a stamp measured on a different engine version. (Same family as the D3 rule:
 a missing engine yields `UNVERIFIED (engine unavailable)`, never a silent PASS.)
+
+Canonical implementation: `references/snippets/engine_check.py::parse_engine_pins` /
+`live_version` / `check_engine_drift`.

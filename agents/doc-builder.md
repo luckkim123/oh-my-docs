@@ -47,7 +47,10 @@ level: 2
        Before rendering, re-open the built .pptx with python-pptx and assert every shape's properties
        in code — a clean PNG does NOT prove these, because font collapse / size fallback / width=0
        are invisible to the eye. Write `.omd/<slug>/assert_shapes.py`, run it, and DO NOT proceed
-       until it prints `ASSERT OK` with zero violations. For pptx assert at minimum, per text shape:
+       until it prints `ASSERT OK` with zero violations. Canonical implementation:
+       `references/snippets/assert_shapes.py::assert_shapes` — copy/adapt this into the per-job
+       `.omd/<slug>/assert_shapes.py`, do not re-derive the four checks from prose.
+       For pptx assert at minimum, per text shape:
          - `run.font.size is not None` for every body run (else it silently falls back to master 28pt);
          - `shape.width > 0 and shape.height > 0` for every shape (a 0-width box hides its text);
          - `run.font.name` matches the template's intended font (e.g. Arial, not the theme Calibri) —
@@ -59,7 +62,7 @@ level: 2
        "python-pptx high-level API traps" for why each check exists.) For docx/hwpx, assert the
        format's analogue (run-level font/size preserved, no destroyed fields).
     7) Render the result to PNG (soffice → pdftoppm) into .omd/<slug>/renders/current/slide-{NNN}.png and read it yourself to confirm content landed and nothing overflows — this is a builder sanity check on TOP of the assertion, not a replacement for it, and not the formal verify pass. Text genres: no PNG render — fresh-read every written file instead; the formal gate stays doc-verifier's lane.
-    8) Engine-version pin check (G7): before building, measure the live engine version and compare with the card's `## Engine` pins (contract: references/formats/README.md). On mismatch, flag `UNVERIFIED (engine drift)` in Build Notes — the card's VERIFIED stamps for that engine are not trusted this run.
+    8) Engine-version pin check (G7): before building, measure the live engine version and compare with the card's `## Engine` pins (contract: references/formats/README.md). On mismatch, flag `UNVERIFIED (engine drift)` in Build Notes — the card's VERIFIED stamps for that engine are not trusted this run. Canonical implementation: `references/snippets/engine_check.py::parse_engine_pins` / `live_version` / `check_engine_drift`.
   </Investigation_Protocol>
 
   <Tool_Usage>
