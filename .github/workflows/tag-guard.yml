@@ -1,0 +1,25 @@
+name: Tag Guard
+
+# Runs the version SSOT / release-tag-drift test in isolation. actions/checkout@v4
+# does not fetch tags by default, so a plain `checkout@v4` (as in ci.yml) makes
+# the tag surface of test_version_sync.py silently see zero tags and skip the
+# check it exists to run — this workflow explicitly opts into fetch-tags so the
+# guard actually has tags to compare against.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tag-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pytest
+      - run: python3 -m pytest tests/test_version_sync.py -v
