@@ -1,4 +1,4 @@
-"""Tests for the document-routing UserPromptSubmit hook (route_emit.py).
+"""Tests for the document-routing UserPromptSubmit hook (docs_route_emit.py).
 
 핵심 계약: 문서 작업이면 매 턴 FORMAT+STAGE 판정을 응답 맨 앞(omha ROUTE 줄
 다음)에 출력하라는 contract 를 주입한다. omha 의 ROUTE(LANE)·oms 의 STAGE(paper)
@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-HOOK = Path(__file__).parent.parent / "hooks" / "route_emit.py"
+HOOK = Path(__file__).parent.parent / "hooks" / "docs_route_emit.py"
 
 
 def run_hook(payload: dict) -> str:

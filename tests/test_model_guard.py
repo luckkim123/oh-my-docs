@@ -1,4 +1,4 @@
-"""Tests for the model-tier advisory guard PreToolUse(Task) hook (model_guard.py, G4).
+"""Tests for the model-tier advisory guard PreToolUse(Task) hook (docs_model_guard.py, G4).
 
 핵심 계약: model 미지정은 정상 상태(spec AC-2) — 절대 경고하지 않는다. 감지 대상은
 ① 명시적으로 frontmatter와 다른 model을 지정한 호출 ② 존재하지 않는 oh-my-docs
@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-HOOK = Path(__file__).parent.parent / "hooks" / "model_guard.py"
+HOOK = Path(__file__).parent.parent / "hooks" / "docs_model_guard.py"
 
 
 def _payload(subagent_type=None, model=None):
