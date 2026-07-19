@@ -62,6 +62,8 @@ Spreadsheets do not proofread by "render every page to image" — print paginati
   soffice --headless --convert-to pdf --outdir <dir> <book.xlsx>
   pdftoppm -jpeg -r 150 <book.pdf> <dir>/sheet   # JPEG (see docx/pptx card for the -png first-page bug)
   ```
+  Canonical implementation: `references/snippets/render.py::soffice_to_pdf` /
+  `references/snippets/render.py::pdf_to_images`.
   (`SAL_USE_VCLPLUGIN=svp` for headless; sandbox socket shim per anthropics/skills `office/soffice.py`.)
 
 ## Financial-model authoring conventions (when the deliverable is a model, not just a sheet)

@@ -26,6 +26,8 @@
 soffice --headless --convert-to pdf --outdir <dir> <deck.pptx>
 pdftoppm -png -r 150 <deck.pdf> <dir>/slide   # ≥150 dpi — low dpi hides overlap
 ```
+Canonical implementation: `references/snippets/render.py::soffice_to_pdf` /
+`references/snippets/render.py::pdf_to_images`.
 
 ## Building on a master template — clone layouts, do NOT hand-draw
 
@@ -141,6 +143,8 @@ pdftoppm -png -r 150 <deck.pdf> <dir>/slide   # ≥150 dpi — low dpi hides ove
   the ContentType value); (4) every `r:id` used in `presentation.xml` — **including `sldId`,
   `notesMasterIdLst`, `handoutMasterIdLst`** — is in `presentation.xml.rels`, and `sldId` ids/rIds are
   unique; (5) every `<p:sldLayoutId r:id>` in each `slideMaster` resolves in that master's rels.
+  Canonical implementation: `references/snippets/integrity.py::find_dangling_rels` /
+  `find_unregistered_rids` / `find_content_types_gaps` / `find_orphan_master`.
   Then `lxml.etree.fromstring` every `.xml`/`.rels` (regex edits can unbalance tags). Authority rule
   still holds: these predict the repair prompt, but the user's PowerPoint is final ground truth.
 - **AlternateContent (Choice/Fallback)**: a shape can have two XML representations; editing only

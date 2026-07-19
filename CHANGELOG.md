@@ -15,6 +15,28 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-19
+
+### Added
+
+- **`references/snippets/` — canonical render/assert code library** (design:
+  `.sp/specs/2026-07-19-omdsnip-design.md`): four single-purpose reference-implementation files
+  (`render.py`, `integrity.py`, `assert_shapes.py`, `engine_check.py`) plus a contract README,
+  each copy/adapt-only per the "rebuild, don't wrap" audit rule — never imported by an agent at
+  runtime, only by this repo's own test suite. Closes a real correctness risk (not just a
+  token-cost one): `doc-builder`'s self-gate shape assertion and `doc-verifier`'s independent
+  re-run now point at the exact same `assert_shapes()` function instead of two hand-derived
+  copies that could silently diverge. Also codifies the OOXML 5-way closure scan
+  (`integrity.py`), the soffice/pdftoppm render recipe (`render.py`), and the G7
+  engine-version-drift check (`engine_check.py`) — each previously re-derived from prose on
+  every job. Pointer lines (`` Canonical implementation: `references/snippets/<file>.py::<function>`. ``)
+  added to `pptx.md`, `docx.md`, `xlsx.md`, `references/formats/README.md`, `doc-builder.md`,
+  `doc-verifier.md` (6 files — `hwpx.md`/`pdf.md` deliberately excluded, see design Out-of-scope).
+  4 new test files, all import-clean and collection-safe with no optional library installed
+  (`pptx`/`pypdf`/`soffice`/`pdftoppm` absent), verified against the clean-CI shape in
+  `.github/workflows/ci.yml`. No behavior change to any agent — only the copy-paste source they
+  already used improves.
+
 ## [0.5.4] - 2026-07-19
 
 ### Fixed

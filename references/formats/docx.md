@@ -25,6 +25,8 @@
 soffice --headless --convert-to pdf --outdir <dir> <doc.docx>
 pdftoppm -jpeg -r 150 <doc.pdf> <dir>/page   # JPEG, ≥150 dpi
 ```
+Canonical implementation: `references/snippets/render.py::soffice_to_pdf` /
+`references/snippets/render.py::pdf_to_images`.
 > ⚠️ **Use `-jpeg`, not `-png`, when going through PDF for multi-page docs.** `soffice --convert-to png`
 > directly (skipping PDF) only emits the **first page** (long-standing LibreOffice bug). Always
 > PDF→pdftoppm. (Backported from anthropics/skills office QA recipe, 2026-05-31.)
