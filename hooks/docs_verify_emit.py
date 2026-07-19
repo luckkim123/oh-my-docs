@@ -26,8 +26,11 @@ import json
 import os
 import re
 import sys
-import tempfile
 import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from omd_atomic import atomic_write_json  # noqa: E402
 
 # Build/convert signals — generation, not read-only inspection. These name the
 # engine/convert explicitly, so they fire on their own (an extension confirms intent).
@@ -110,12 +113,7 @@ def _sentinel_path(root, command):
 
 def _write_sentinel(path, head):
     """Atomic write (ST-1): half-written sentinels must never exist."""
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    body = json.dumps({"armed_at": time.time(), "command_head": head[:80]})
-    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".tmp-verify-")
-    with os.fdopen(fd, "w") as f:
-        f.write(body)
-    os.replace(tmp, path)
+    atomic_write_json(path, {"armed_at": time.time(), "command_head": head[:80]})
 
 
 def arm_sentinel(root, command):
@@ -248,14 +246,14 @@ def reminder_throttled(root: str, message: str) -> bool:
     except Exception:
         seen = {}
     throttled = isinstance(seen, dict) and now - float(seen.get(digest, 0) or 0) < cooldown
-    if not throttled:
+    # never fabricate root (.omd/) — the vendored atomic_write_json mkdirs its
+    # parent, unlike the old inline tempfile.mkstemp(dir=root) which just failed
+    # silently when root was missing (noise control, mirrors arm_sentinel's guard).
+    if not throttled and os.path.isdir(root):
         try:
             seen = seen if isinstance(seen, dict) else {}
             seen[digest] = now
-            fd, tmp = tempfile.mkstemp(dir=root, prefix=".tmp-throttle-")
-            with os.fdopen(fd, "w") as f:
-                json.dump(seen, f)
-            os.replace(tmp, path)
+            atomic_write_json(path, seen)
         except Exception:
             pass  # recording failure must not suppress the reminder
     return throttled
