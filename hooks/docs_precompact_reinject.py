@@ -14,7 +14,10 @@ Advisory infrastructure only — a broken notepad must never block anything.
 import json
 import os
 import sys
-import tempfile
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from omd_atomic import atomic_write_text  # noqa: E402
 
 PRIORITY = "## Priority Context"
 WORKING = "## Working Notes"
@@ -75,17 +78,7 @@ def prune(notepad_path):
         if head is not None:
             out.append(head)
         out.extend(lines)
-    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(notepad_path), suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write("\n".join(out) + "\n")
-        os.replace(tmp, notepad_path)  # ST-1: atomic, never open+truncate
-    except Exception:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
+    atomic_write_text(notepad_path, "\n".join(out) + "\n")  # ST-1: atomic, never open+truncate
 
 
 def main():

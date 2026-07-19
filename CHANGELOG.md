@@ -15,6 +15,33 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-07-19
+
+### Fixed
+
+- **The 3 inline atomic-write copies in `docs_precompact_reinject.py` and
+  `docs_verify_emit.py` never called `fsync`**, so a power loss between
+  `os.replace` and the OS flushing its page cache could still lose the write.
+  Now routed through a new vendored `hooks/omd_atomic.py` (from the shared
+  `om-core` repo), which fsyncs before replace. Hook imports use the
+  `sys.path.insert(0, str(Path(__file__).parent))` + bare `import omd_atomic`
+  form (matching omp's pattern) rather than `hooks.omd_atomic`, since these
+  hooks run both as a direct subprocess (`sys.path[0]` is the `hooks/` dir) and
+  as a package import under pytest — a package-qualified import only resolves
+  in the second context. The throttle write keeps its `try/except Exception:
+  pass` guard unchanged (a throttle-write error must not suppress the verify
+  reminder) and gained an explicit `os.path.isdir(root)` guard — the vendored
+  `atomic_write_json` mkdirs its parent unconditionally, which would otherwise
+  fabricate `.omd/` in a non-omd repo (the old inline `tempfile.mkstemp`
+  silently failed instead, matching `arm_sentinel`'s existing noise-control
+  guard). The sentinel write drops its now-redundant `os.makedirs` call — the
+  vendored function mkdirs the parent itself — and its format changes from
+  compact to pretty-printed JSON, safe because both readers (`test_verify_emit.py`,
+  the throttle reader) already parse via `json.load`/`json.loads`,
+  format-agnostic. Adds a local-only `tests/test_atomic_vendored_sync.py` that
+  byte-compares the vendored copy against `~/om-core/atomic_fn.py` and skips
+  gracefully when that sibling repo is absent (clean CI).
+
 ## [0.6.0] - 2026-07-19
 
 ### Added
