@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HOOK = os.path.join(os.path.dirname(__file__), "..", "hooks", "docs_precompact_reinject.py")
 PLUGIN_JSON = os.path.join(os.path.dirname(__file__), "..", ".claude-plugin", "plugin.json")
@@ -115,6 +116,21 @@ class TestFailureModes(unittest.TestCase):
                 self.assertEqual([f for f in os.listdir(omd_dir) if ".tmp" in f], [])
             finally:
                 os.chmod(omd_dir, 0o755)
+
+    def test_prune_replace_failure_rolls_back_and_reraises(self):
+        """os.replace() failing mid-write (disk full, etc.) must clean up the
+        temp file and re-raise — never leave a half-written notepad or a
+        leaked *.tmp (lines 83-88's except/unlink/raise)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            lines = [f"- working item {i} " + "x" * 300 for i in range(60)]
+            path = write_notepad(tmp, lines)
+            before = open(path, encoding="utf-8").read()
+            with mock.patch("os.replace", side_effect=OSError("disk full")):
+                with self.assertRaises(OSError):
+                    docs_precompact_reinject.prune(path)
+            self.assertEqual(open(path, encoding="utf-8").read(), before)
+            omd_dir = os.path.dirname(path)
+            self.assertEqual([f for f in os.listdir(omd_dir) if ".tmp" in f], [])
 
     def test_missing_working_notes_section_untouched(self):
         with tempfile.TemporaryDirectory() as tmp:
