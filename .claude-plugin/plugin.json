@@ -27,7 +27,7 @@
           {
             "type": "command",
             "command": "python3",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/route_emit.py"]
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/docs_route_emit.py"]
           }
         ]
       }
@@ -61,7 +61,7 @@
           {
             "type": "command",
             "command": "python3",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/model_guard.py"]
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/docs_model_guard.py"]
           }
         ]
       }
@@ -85,7 +85,7 @@
           {
             "type": "command",
             "command": "python3",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/precompact_reinject.py"]
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/docs_precompact_reinject.py"]
           }
         ]
       }
@@ -97,7 +97,7 @@
           {
             "type": "command",
             "command": "python3",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/precompact_reinject.py"]
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/docs_precompact_reinject.py"]
           }
         ]
       }

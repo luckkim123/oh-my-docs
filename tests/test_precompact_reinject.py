@@ -1,4 +1,4 @@
-"""G2 — hooks/precompact_reinject.py: notepad pruning + compaction-survival reinject."""
+"""G2 — hooks/docs_precompact_reinject.py: notepad pruning + compaction-survival reinject."""
 import json
 import os
 import subprocess
@@ -6,12 +6,12 @@ import sys
 import tempfile
 import unittest
 
-HOOK = os.path.join(os.path.dirname(__file__), "..", "hooks", "precompact_reinject.py")
+HOOK = os.path.join(os.path.dirname(__file__), "..", "hooks", "docs_precompact_reinject.py")
 PLUGIN_JSON = os.path.join(os.path.dirname(__file__), "..", ".claude-plugin", "plugin.json")
 HOOK_DIR = os.path.join(os.path.dirname(__file__), "..", "hooks")
 sys.path.insert(0, HOOK_DIR)
 
-import precompact_reinject  # noqa: E402
+import docs_precompact_reinject  # noqa: E402
 
 NOTEPAD = """# omd notepad
 
@@ -143,9 +143,9 @@ class TestFailureModes(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             lines = [f"- working item {i} " + "x" * 300 for i in range(60)]
             path = write_notepad(tmp, lines)
-            precompact_reinject.prune(path)
+            docs_precompact_reinject.prune(path)
             after_first = open(path, encoding="utf-8").read()
-            precompact_reinject.prune(path)
+            docs_precompact_reinject.prune(path)
             after_second = open(path, encoding="utf-8").read()
             self.assertEqual(after_second, after_first)
 
@@ -155,7 +155,7 @@ class TestRegistration(unittest.TestCase):
         cfg = json.load(open(PLUGIN_JSON, encoding="utf-8"))
         hooks = cfg["hooks"]
         flat = json.dumps(hooks.get("PreCompact", [])) + json.dumps(hooks.get("SessionStart", []))
-        self.assertEqual(flat.count("precompact_reinject.py"), 2)
+        self.assertEqual(flat.count("docs_precompact_reinject.py"), 2)
         # SessionStart는 compact 매처만 — startup 마다 발화하지 않게
         self.assertEqual(hooks["SessionStart"][0]["matcher"], "compact")
 

@@ -89,9 +89,9 @@ agents/       doc-analyzer · doc-planner · doc-builder · doc-inspector · doc
 references/   formats/ (pptx, docx, xlsx, hwpx, pdf, repo-docs, site) · rubrics/ (ppteval,
               repo-docs-rubric, site-rubric) · themes/ (10 office fallback presets) · wiki/ ·
               output-layout.md · learning-protocol.md
-hooks/        route_emit.py (UserPromptSubmit routing) · docs_verify_emit.py
+hooks/        docs_route_emit.py (UserPromptSubmit routing) · docs_verify_emit.py
               (PostToolUse verify reminder, Bash + Edit|Write) · docs_stop_guard.py ·
-              model_guard.py
+              docs_model_guard.py
 ```
 
 Two-level wiki (local `.omd/wiki/` + global ascent, `references/wiki/README.md`) lets each
