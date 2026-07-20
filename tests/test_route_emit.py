@@ -15,12 +15,12 @@ from pathlib import Path
 HOOK = Path(__file__).parent.parent / "hooks" / "docs_route_emit.py"
 
 
-def run_hook(payload: dict) -> str:
+def run_hook(payload: dict, cwd=None, env=None) -> str:
     """훅을 서브프로세스로 실행하고 stdout 반환."""
     proc = subprocess.run(
         [sys.executable, str(HOOK)],
         input=json.dumps(payload),
-        capture_output=True, text=True,
+        capture_output=True, text=True, cwd=cwd, env=env,
     )
     assert proc.returncode == 0, f"hook exited {proc.returncode}: {proc.stderr}"
     return proc.stdout
@@ -196,3 +196,103 @@ def test_site_advertised_with_card():
     out = context_of(run_hook({"prompt": "문서 사이트 만들어줘"}))
     stage_lines = [line for line in out.splitlines() if line.startswith("STAGE(docs)")]
     assert stage_lines and "site" in stage_lines[0]
+
+
+# --- wave-17: relevance gate (OMD_ROUTE_GATE, default off) -------------------
+# Isomorphic to oms's test_scholar_route_emit.py relevance-gate suite (§7.1/§7.2
+# of the design spec). Default OFF must be indistinguishable from today for
+# ANY prompt; "on" only silences prompts that are neither marker- nor
+# keyword-relevant; "observe" always injects (logging only).
+
+def _env(**gate):
+    import os
+    e = dict(os.environ)
+    e.pop("OMD_ROUTE_GATE", None)
+    e.update(gate)
+    return e
+
+
+def test_gate_default_off_injects_even_for_irrelevant_prompt():
+    """기본값(env 미설정) = off. 무관 프롬프트("hello")도 오늘처럼 무조건 주입."""
+    out = context_of(run_hook({"prompt": "hello"}, env=_env()))
+    assert "STAGE(docs) →" in out
+
+
+def test_gate_off_mode_injects_always():
+    """OMD_ROUTE_GATE=off 명시해도 동일 — 게이트 코드 전체 우회."""
+    out = context_of(run_hook({"prompt": "random unrelated text"}, env=_env(OMD_ROUTE_GATE="off")))
+    assert "STAGE(docs) →" in out
+
+
+def test_gate_on_non_domain_prompt_is_silent():
+    """on + 무관 프롬프트 → 침묵(injection tax 0)."""
+    out = run_hook({"prompt": "hello"}, env=_env(OMD_ROUTE_GATE="on"))
+    assert out.strip() == ""
+
+
+def test_gate_on_word_boundary_no_false_positive():
+    """on + 부분문자열 오탐 금지 — "deck" 이 "decked" 안에서 발동하면 안 된다."""
+    out = run_hook({"prompt": "we decked out the room for the party"}, env=_env(OMD_ROUTE_GATE="on"))
+    assert out.strip() == ""
+
+
+def test_gate_on_missing_prompt_key_injects():
+    """on + prompt 키 자체가 없으면 fail-toward-inject — 전체 CHECKPOINT."""
+    out = context_of(run_hook({}, env=_env(OMD_ROUTE_GATE="on")))
+    assert "STAGE(docs) →" in out
+
+
+def test_gate_on_bad_stdin_fail_open_exit0():
+    """on + 파싱 불가 stdin → exit 0 (세션 안 막음), fail-toward-inject."""
+    proc = subprocess.run(
+        [sys.executable, str(HOOK)],
+        input="not json at all", capture_output=True, text=True, env=_env(OMD_ROUTE_GATE="on"),
+    )
+    assert proc.returncode == 0
+    assert "STAGE(docs) →" in context_of(proc.stdout)
+
+
+def test_gate_on_marker_present_forces_inject(tmp_path):
+    """on + .omd/ 존재 → 무관 프롬프트여도 주입 (marker OR keyword 의 marker 다리)."""
+    (tmp_path / ".omd").mkdir()
+    out = context_of(run_hook({"prompt": "hello"}, cwd=str(tmp_path), env=_env(OMD_ROUTE_GATE="on")))
+    assert "STAGE(docs) →" in out
+
+
+def test_gate_on_keyword_only_injects_without_marker(tmp_path):
+    """on + marker 없는 cwd + 도메인 키워드("pptx 만들어줘") → 주입."""
+    out = context_of(run_hook({"prompt": "pptx 만들어줘"}, cwd=str(tmp_path), env=_env(OMD_ROUTE_GATE="on")))
+    assert "STAGE(docs) →" in out
+
+
+def test_gate_on_excluded_polyseme_is_silent(tmp_path):
+    """on + marker 없는 cwd + 다의어 단독("이거 만들어줘") → 침묵 (제외 규칙 확인)."""
+    out = run_hook({"prompt": "이거 만들어줘"}, cwd=str(tmp_path), env=_env(OMD_ROUTE_GATE="on"))
+    assert out.strip() == ""
+
+
+def test_gate_observe_mode_injects_and_logs(tmp_path):
+    """observe + 무관 프롬프트 → 여전히 주입(§4 byte-identity 유지) + would-suppress 로그 1줄."""
+    proc = subprocess.run(
+        [sys.executable, str(HOOK)],
+        input=json.dumps({"prompt": "hello"}), cwd=str(tmp_path),
+        capture_output=True, text=True, env=_env(OMD_ROUTE_GATE="observe"),
+    )
+    assert proc.returncode == 0
+    assert "STAGE(docs) →" in context_of(proc.stdout)
+    logged = json.loads(proc.stderr.strip())
+    assert logged["decision"] == "would-suppress"
+
+
+def test_gate_on_golden_positive_path_byte_identical(tmp_path):
+    """§4 HARD REQUIREMENT: gate=on 의 true-positive 출력은 off(=오늘)의 출력과
+    byte-for-byte 동일해야 한다 — gate 는 WHETHER 만 결정, WHAT 은 절대 안 건드림."""
+    off_out = run_hook({"prompt": "pptx 만들어줘"}, cwd=str(tmp_path), env=_env(OMD_ROUTE_GATE="off"))
+    on_out = run_hook({"prompt": "pptx 만들어줘"}, cwd=str(tmp_path), env=_env(OMD_ROUTE_GATE="on"))
+    assert on_out == off_out
+
+
+def test_gate_route_emit_module_importable_stdlib_only():
+    """게이트 추가 후에도 stdlib only 유지 (회귀)."""
+    src = HOOK.read_text()
+    assert "import requests" not in src and "import a2a" not in src
