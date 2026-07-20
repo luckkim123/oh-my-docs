@@ -12,7 +12,17 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+from test_plugin_integrity import registered_skills  # noqa: E402
+
 HOOK = Path(__file__).parent.parent / "hooks" / "docs_route_emit.py"
+
+# H5: pdf is input/convert-layer only, never a generation stage (docs-pdf reads/fills
+# an existing PDF; docs-convert owns the export-to-pdf direction) — an intentional
+# carve-out, not drift. test_pdf_is_not_a_generation_format below pins its absence
+# from the STAGE token line; this constant is what keeps the coverage test below
+# from flagging that absence as a bug.
+EXCLUDED = {"docs-pdf"}
 
 
 def run_hook(payload: dict) -> str:
@@ -47,16 +57,42 @@ def test_context_states_stage_emit_contract():
 
 
 def test_context_lists_all_stages():
-    """③ 9개 단계가 contract 에 모두 열거돼야 (skill 과 정합).
+    """③ 11개 단계가 contract 에 모두 열거돼야 (skill 과 정합).
 
     revise 는 docs-revise 스킬이 실재하므로 STAGE 카탈로그에 포함돼야 한다
     (T14 에서 누락을 수정). pilot 은 docs-pilot 로 표기.
     learn 은 docs-learn 스킬(관찰→style-spec 기본값 승격, 사람 게이트)이
-    실재하므로 메타 단계로 포함돼야 한다 (H9 에서 추가)."""
+    실재하므로 메타 단계로 포함돼야 한다 (H9 에서 추가).
+    convert·translate 는 docs-convert·docs-translate 스킬이 실재하므로
+    STAGE 카탈로그에 포함돼야 한다 (누락을 수정 — plugin.json 등록부에는
+    있었으나 라우팅 STAGE enum 에서 빠져 도달 불가였음)."""
     out = context_of(run_hook({"prompt": "문서 작업"}))
     for stage in ("intake", "standardize", "plan", "build",
-                  "inspect", "verify", "revise", "learn", "docs-pilot"):
+                  "inspect", "verify", "convert", "translate",
+                  "revise", "learn", "docs-pilot"):
         assert stage in out, f"stage '{stage}' missing from contract"
+
+
+def test_stage_token_line_covers_all_registered_skills():
+    """③-e plugin.json↔STAGE enum coverage guard (structural — mirrors
+    test_plugin_integrity's disk↔registration pattern and ⑪'s hook-driven sync check).
+
+    Every registered skill except EXCLUDED must be reachable from the STAGE token
+    line, either as a bare token (`convert`) or its docs-prefixed form (`docs-pilot`).
+    This is what the convert/translate drift actually was: both were registered in
+    plugin.json but absent from the STAGE enum, so a session following the routing
+    checkpoint literally could not select them. A hand-typed enum will drift again;
+    this test makes the next omission a CI failure instead of a support ticket."""
+    out = context_of(run_hook({"prompt": "문서 작업"}))
+    stage_lines = [line for line in out.splitlines() if line.startswith("STAGE(docs)")]
+    assert stage_lines, "STAGE token line must exist"
+    stage_line = stage_lines[0]
+    reachable = registered_skills() - EXCLUDED
+    missing = {
+        skill for skill in reachable
+        if skill.removeprefix("docs-") not in stage_line and skill not in stage_line
+    }
+    assert not missing, f"registered skills unreachable via STAGE token line: {sorted(missing)}"
 
 
 def test_learn_stage_in_routing_token_line():
