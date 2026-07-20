@@ -14,9 +14,20 @@ picks FORMAT + STAGE within that lane. The two do not conflict.
 MVP: static checkpoint text (no keyword parsing). Stage 2 may add dynamic
 format-keyword detection that reads the skills' Triggers. Fail-open: any error
 returns 0 so the session is never blocked.
+
+Relevance gate (wave-17, ported from oms's is_paper_related): the gate only
+decides WHETHER to inject, never WHAT — a true positive (project marker OR a
+high-specificity docs keyword) prints the exact same CHECKPOINT literal below,
+byte-for-byte, via the single _emit_checkpoint() assembly. Rollout is a
+3-state OMD_ROUTE_GATE env flag (off/observe/on), default "off": the gate code
+is fully bypassed and today's unconditional inject is unchanged.
 """
+import hashlib
 import json
+import os
+import re
 import sys
+from pathlib import Path
 
 CHECKPOINT = (
     "<omd-routing>\n"
@@ -46,16 +57,97 @@ CHECKPOINT = (
     "</omd-routing>"
 )
 
+# --- relevance gate (wave-17) -------------------------------------------------
+# High-specificity docs-domain tokens only. Deliberately excludes polysemous
+# bare verbs (만들어/생성/빌드/make/build/generate) — they appear in nearly every
+# coding turn, so including them would erase the injection-tax savings this
+# gate exists for (spec §5). A project marker (.omd/) covers those turns anyway.
+_CJK_TOKENS = (
+    "발표자료", "슬라이드", "문서", "보고서", "양식", "아웃라인", "스토리라인", "목차", "템플릿",
+)
+_DOT_TOKENS = (".pptx", ".docx", ".xlsx", ".hwpx")
+_ASCII_TOKENS = (
+    "pptx", "docx", "xlsx", "hwpx", "slide", "slides", "presentation", "deck",
+    "powerpoint", "document", "outline", "readme", "changelog", "mkdocs", "docs-pilot",
+)
+_ASCII_RE = re.compile(r"\b(?:" + "|".join(re.escape(t) for t in _ASCII_TOKENS) + r")\b")
+
+
+def _has_omd_marker() -> bool:
+    return (Path.cwd() / ".omd").is_dir()
+
+
+def is_docs_related(prompt) -> bool:
+    """True when a project-state marker (.omd/) is present, prompt is
+    missing/not-a-string (fail-toward-inject), or any docs-domain token
+    matches. Never raises -- an internal error (including a marker-probe
+    failure) also fails toward injection."""
+    try:
+        if _has_omd_marker():
+            return True
+        if not isinstance(prompt, str):
+            return True
+        lowered = prompt.lower()
+        if any(tok in lowered for tok in _CJK_TOKENS):
+            return True
+        if any(tok in lowered for tok in _DOT_TOKENS):
+            return True
+        return bool(_ASCII_RE.search(lowered))
+    except Exception:
+        return True  # gate exception -> inject
+
+
+def _gate_mode() -> str:
+    try:
+        v = os.environ.get("OMD_ROUTE_GATE", "off").strip().lower()
+    except Exception:
+        return "off"
+    return v if v in ("off", "observe", "on") else "off"
+
+
+def _log_would_suppress(prompt) -> None:
+    """observe-mode audit trail (rollout §6): one stderr line per turn the gate
+    would have suppressed, so real-traffic false-negative risk can be measured
+    before flipping to "on". Best-effort — never raises, never touches stdout
+    (byte-identity of the injected context is untouched)."""
+    try:
+        digest = (hashlib.sha256(prompt.encode("utf-8", "replace")).hexdigest()[:16]
+                  if isinstance(prompt, str) else "none")
+        sys.stderr.write(json.dumps({"decision": "would-suppress", "prompt_hash": digest}) + "\n")
+    except Exception:
+        pass
+
+
+def _emit_checkpoint() -> None:
+    out = {
+        "hookSpecificOutput": {
+            "hookEventName": "UserPromptSubmit",
+            "additionalContext": CHECKPOINT,
+        }
+    }
+    print(json.dumps(out))
+
 
 def main() -> int:
     try:
-        out = {
-            "hookSpecificOutput": {
-                "hookEventName": "UserPromptSubmit",
-                "additionalContext": CHECKPOINT,
-            }
-        }
-        print(json.dumps(out))
+        mode = _gate_mode()
+        if mode == "off":
+            _emit_checkpoint()  # today's unconditional inject, unchanged
+            return 0
+        try:
+            payload = json.load(sys.stdin)
+        except Exception:
+            payload = None
+        prompt = payload.get("prompt") if isinstance(payload, dict) else None
+        relevant = is_docs_related(prompt)
+        if mode == "observe":
+            if not relevant:
+                _log_would_suppress(prompt)
+            _emit_checkpoint()  # observe never suppresses — logging only
+            return 0
+        if not relevant:
+            return 0  # mode == "on": enforce
+        _emit_checkpoint()
     except Exception:
         return 0  # fail-open — never block the session
     return 0
