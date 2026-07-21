@@ -5,13 +5,20 @@ docs_verify_emit hook ARMS a `.omd/**/.verify-pending` sentinel on every documen
 build and CLEARS it when a verify-signal command runs; this hook, at Stop, lists
 any sentinels still pending. Strictly advisory (D6): never `decision: block` —
 deferring verify is legitimate, so the wording absorbs it (HK-2). Re-entry safe:
-exits immediately when stop_hook_active (G1-chk).
+exits immediately when stop_hook_active (G1-chk). Carried-over sentinels are
+announced once per session, not at every Stop (D2, v0.6.2 — see
+suppress_notified_carryovers).
 """
+import hashlib
 import json
 import os
 import re
 import sys
 import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from omd_atomic import atomic_write_json  # noqa: E402
 
 SENTINEL = ".verify-pending"
 STALE_AFTER = 6 * 3600  # older = carried over from an earlier session (HK-4)
@@ -23,6 +30,17 @@ STALE_AFTER = 6 * 3600  # older = carried over from an earlier session (HK-4)
 SLUGLESS_EXPIRE_AFTER = 7 * 24 * 3600
 EVIDENCE_LOG = "stage-evidence.log"
 PILOT_STAGES = ("1", "2", "3", "4", "5", "6")  # intake..verify (docs-pilot Steps 1-6)
+# D2 (v0.6.2): shared with docs_verify_emit's HG-3 reminder cooldown — same file,
+# same atomic writer, same kill switch (OMD_REMINDER_COOLDOWN_SECONDS<=0).
+THROTTLE_FILE = ".hook-throttle.json"
+SEEN_TTL = 7 * 24 * 3600  # prune old entries so per-session keys never accumulate
+
+
+def _armed_at(path):
+    try:
+        return float(json.load(open(path)).get("armed_at", 0) or 0)
+    except Exception:
+        return 0.0
 
 
 def expire_stale_slugless(root: str):
@@ -33,11 +51,7 @@ def expire_stale_slugless(root: str):
     path = os.path.join(root, SENTINEL)
     if not os.path.isfile(path):
         return None
-    try:
-        armed = float(json.load(open(path)).get("armed_at", 0) or 0)
-    except Exception:
-        armed = 0.0
-    if time.time() - armed <= SLUGLESS_EXPIRE_AFTER:
+    if time.time() - _armed_at(path) <= SLUGLESS_EXPIRE_AFTER:
         return None
     try:
         os.remove(path)
@@ -67,11 +81,8 @@ def build_message(items):
     lines = []
     now = time.time()
     for slug, path in items:
-        try:
-            armed = json.load(open(path)).get("armed_at", 0)
-        except Exception:
-            armed = 0
-        tag = " — carried over from an earlier session" if now - armed > STALE_AFTER else ""
+        tag = (" — carried over from an earlier session"
+               if now - _armed_at(path) > STALE_AFTER else "")
         lines.append(f"  - {slug}{tag}")
     return (
         "[OMD verify-pending] 이 세션에서 빌드된 문서 중 fresh verify가 아직 확인되지 않은 항목:\n"
@@ -79,6 +90,55 @@ def build_message(items):
         + "\n검증하려면 docs-verify(무결성 게이트+전수 정독). "
         "advisory입니다 — verify를 나중에 해도 무방하며, 의도적 유예라면 무시하고 진행하세요."
     )
+
+
+def suppress_notified_carryovers(root, items, session_id):
+    """D2 (v0.6.2): carried-over sentinels (armed_at past STALE_AFTER) used to
+    re-warn at EVERY Stop — stop_hook_active is an in-Stop re-entry latch, not
+    per-turn suppression (8+ repeats in one session, 2026-07-21). Now a given
+    carried-over set is announced once per session_id. HK-4 ("real carried-over
+    work stays visible") is kept, refined: sentinels still never expire, and
+    every NEW session surfaces them again at its first Stop — only same-session
+    repetition is absorbed (spec §7 ⑥ alert fatigue, the same rationale as
+    stage_evidence_gaps' named exception). Fresh sentinels (this session's own
+    work, by the same 6h proxy the stale tag uses) keep warning at every Stop.
+    Reuses the HG-3 throttle store; OMD_REMINDER_COOLDOWN_SECONDS<=0 is the
+    same kill switch; no session_id in the payload → no suppression, and a
+    failed record → warn again next Stop (both fail open toward visibility)."""
+    if not session_id or not items:
+        return items
+    try:
+        if float(os.environ.get("OMD_REMINDER_COOLDOWN_SECONDS", 1)) <= 0:
+            return items
+    except ValueError:
+        pass
+    now = time.time()
+    fresh, stale = [], []
+    for item in items:
+        (stale if now - _armed_at(item[1]) > STALE_AFTER else fresh).append(item)
+    if not stale:
+        return items
+    # Key on the stale SET, not the session alone: a slug crossing the 6h line
+    # (or getting verified) mid-session changes the set and earns one re-notice.
+    key = hashlib.sha256(("stop-carryover:%s:%s" % (
+        session_id, ",".join(sorted(slug for slug, _ in stale)))).encode("utf-8")).hexdigest()
+    throttle = os.path.join(root, THROTTLE_FILE)
+    try:
+        seen = json.load(open(throttle, encoding="utf-8"))
+    except Exception:
+        seen = {}
+    if not isinstance(seen, dict):
+        seen = {}
+    if key in seen:
+        return fresh
+    try:
+        seen[key] = now
+        seen = {k: v for k, v in seen.items()
+                if isinstance(v, (int, float)) and now - v < SEEN_TTL}
+        atomic_write_json(throttle, seen)
+    except Exception:
+        pass  # recording failure must not hide the notice
+    return items
 
 
 def stage_evidence_gaps(root):
@@ -124,7 +184,8 @@ def main() -> int:
             return 0  # G1-chk: never re-fire inside a stop-hook continuation
         root = os.path.join(payload.get("cwd") or os.getcwd(), ".omd")
         expiry_notice = expire_stale_slugless(root)  # G7: before listing pendings
-        items = pending_sentinels(root)
+        items = suppress_notified_carryovers(
+            root, pending_sentinels(root), payload.get("session_id"))
         gaps = stage_evidence_gaps(root)
         blocks = []
         if expiry_notice:

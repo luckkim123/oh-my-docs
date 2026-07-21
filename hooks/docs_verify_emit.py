@@ -102,13 +102,39 @@ THROTTLE_FILE = ".hook-throttle.json"
 DEFAULT_COOLDOWN = 600.0
 
 
+def _cwd_context(cwd):
+    """D1 (v0.6.2): a verify/build command run from inside .omd/<slug>/ or
+    outputs/<slug>/ (relative-path renders) names no slug in its command string,
+    and <cwd>/.omd resolves to a path that does not exist — clear_sentinels
+    returned early and the real slug sentinel survived, so the Stop guard
+    re-warned all session long (2026-07-21 utracker-seminar leak). Derive
+    (project .omd root, slug) from cwd path COMPONENTS instead (not substrings —
+    a `test_outputs/` dir must not match); (None, None) when cwd sits under
+    neither anchor, so callers keep the old behavior."""
+    parts = os.path.normpath(cwd or "").split(os.sep)
+    for anchor in (".omd", "outputs"):  # .omd first — the more specific anchor
+        if anchor in parts:
+            i = parts.index(anchor)
+            return (os.sep.join(parts[:i] + [".omd"]),
+                    parts[i + 1] if len(parts) > i + 1 else None)
+    return None, None
+
+
 def _omd_root(payload):
-    return os.path.join(payload.get("cwd") or os.getcwd(), ".omd")
+    cwd = payload.get("cwd") or os.getcwd()
+    root, _ = _cwd_context(cwd)
+    return root or os.path.join(cwd, ".omd")
 
 
-def _sentinel_path(root, command):
+def _slug_of(command, cwd):
+    """Slug from the command string (SLUG_RE), falling back to the cwd path (D1)."""
     m = SLUG_RE.search(command)
-    return os.path.join(root, m.group(1), SENTINEL) if m else os.path.join(root, SENTINEL)
+    return m.group(1) if m else _cwd_context(cwd)[1]
+
+
+def _sentinel_path(root, command, cwd=""):
+    slug = _slug_of(command, cwd)
+    return os.path.join(root, slug, SENTINEL) if slug else os.path.join(root, SENTINEL)
 
 
 def _write_sentinel(path, head):
@@ -116,22 +142,25 @@ def _write_sentinel(path, head):
     atomic_write_json(path, {"armed_at": time.time(), "command_head": head[:80]})
 
 
-def arm_sentinel(root, command):
+def arm_sentinel(root, command, cwd=""):
     # v0.5.1 noise control: only an existing .omd/ project can be armed — never
     # fabricate .omd/ in a repo the pipeline has not touched. Mirrors
     # handle_md_edit's "no slug context -> not an omd artifact" rule.
     if not os.path.isdir(root):
         return
-    _write_sentinel(_sentinel_path(root, command), command)
+    _write_sentinel(_sentinel_path(root, command, cwd), command)
 
 
-def clear_sentinels(root, command):
-    # ponytail: clearing heuristic is command-string sniffing; upgrade to explicit
-    # verify-stage signaling if false-clears surface
+def clear_sentinels(root, command, cwd=""):
+    # ponytail: clearing heuristic is command-string sniffing (+ cwd fallback, D1);
+    # upgrade to explicit verify-stage signaling if false-clears surface
     if not os.path.isdir(root):
         return  # defensive: callable safely outside main()'s try envelope
-    m = SLUG_RE.search(command)
-    targets = ([os.path.join(root, m.group(1), SENTINEL)] if m
+    slug = _slug_of(command, cwd)
+    # A slug identified (command or cwd) clears ONLY that slug — never widen the
+    # broad fallback (a broad clear would neuter the guard). Slugless stays as
+    # before: root sentinel + every first-level slug (pre-D1 contract, unchanged).
+    targets = ([os.path.join(root, slug, SENTINEL)] if slug
                else [os.path.join(root, SENTINEL)]
                + [os.path.join(root, d, SENTINEL) for d in os.listdir(root)
                   if os.path.isdir(os.path.join(root, d))])
@@ -278,7 +307,7 @@ def main() -> int:
     # verify 실행이 최우선 — strict 빌드가 BUILD_SIGNALS 에 걸려 재-arm 되는 것 방지 (결정 2).
     try:
         if command and is_verify_run(command):
-            clear_sentinels(_omd_root(payload), command)
+            clear_sentinels(_omd_root(payload), command, payload.get("cwd") or "")
             return 0
     except Exception:
         pass  # fail-open
@@ -288,7 +317,7 @@ def main() -> int:
         return 0
 
     try:
-        arm_sentinel(_omd_root(payload), command)
+        arm_sentinel(_omd_root(payload), command, payload.get("cwd") or "")
     except Exception:
         pass  # fail-open: sentinel is best-effort, reminder still fires
 

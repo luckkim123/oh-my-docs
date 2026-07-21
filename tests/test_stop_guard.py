@@ -19,17 +19,20 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 from hooks.docs_stop_guard import expire_stale_slugless
 
 HOOK = Path(__file__).parent.parent / "hooks" / "docs_stop_guard.py"
 
 
-def run_hook(payload: dict) -> subprocess.CompletedProcess:
+def run_hook(payload: dict, env: Optional[dict] = None) -> subprocess.CompletedProcess:
+    run_env = {**os.environ, **env} if env else None
     return subprocess.run(
         [sys.executable, str(HOOK)],
         input=json.dumps(payload),
         capture_output=True, text=True,
+        env=run_env,
     )
 
 
@@ -194,3 +197,73 @@ def test_slugged_sentinel_never_self_expires(tmp_path):
     assert proc.returncode == 0
     assert "mydeck" in proc.stdout
     assert (root / "mydeck" / ".verify-pending").is_file()
+
+
+# ── D2 (v0.6.2): 이월 센티널 세션당 1회 알림 (2026-07-21 매 턴 재경고 사고) ──
+# stop_hook_active 는 한 Stop 안의 재진입 래치일 뿐 턴 간 억제가 아니라서,
+# TTL 없는 이월(6h+) 센티널이 세션 내내(8회+) 매 Stop 재경고했다. 수정: 같은
+# 이월 집합은 session_id 당 1회만 알린다. HK-4("real carried-over work stays
+# visible")는 유지·정제 — 센티널은 여전히 만료되지 않고, 새 세션마다 첫 Stop
+# 에서 반드시 1회 노출된다. 억제되는 것은 같은 세션 안의 반복뿐(§7 ⑥ alert
+# fatigue — stage_evidence_gaps 의 named exception 과 같은 근거). 신선한(6h
+# 이내) 센티널은 무변: 매 Stop 경고. 저장소는 HG-3 과 같은
+# .omd/.hook-throttle.json, 킬스위치도 동일(OMD_REMINDER_COOLDOWN_SECONDS<=0).
+
+
+def test_carried_over_notifies_once_per_session_but_every_new_session(tmp_path):
+    """d2-1) 이월 센티널: 같은 session_id 두 번째 Stop 은 침묵, 센티널은 잔존,
+    새 session_id 는 다시 1회 알림 (HK-4 가시성 유지의 핵심 증거)."""
+    root = tmp_path / ".omd"
+    write_sentinel(root, "olddeck", time.time() - 7 * 3600)
+    p1 = run_hook({"cwd": str(tmp_path), "session_id": "sess-1"})
+    assert "carried over" in p1.stdout
+    p2 = run_hook({"cwd": str(tmp_path), "session_id": "sess-1"})
+    assert p2.returncode == 0
+    assert p2.stdout.strip() == ""
+    assert (root / "olddeck" / ".verify-pending").is_file()  # TTL 아님
+    p3 = run_hook({"cwd": str(tmp_path), "session_id": "sess-2"})
+    assert "carried over" in p3.stdout
+
+
+def test_fresh_sentinel_warns_every_stop_same_session(tmp_path):
+    """d2-2) 신선한 센티널(이번 세션 무장)은 같은 세션에서도 매 Stop 경고 —
+    억제는 이월분에만 적용된다."""
+    root = tmp_path / ".omd"
+    write_sentinel(root, "mydeck", time.time())
+    for _ in range(2):
+        proc = run_hook({"cwd": str(tmp_path), "session_id": "sess-1"})
+        assert "mydeck" in proc.stdout
+
+
+def test_mixed_second_stop_lists_only_fresh(tmp_path):
+    """d2-3) 이월+신선 혼재: 첫 Stop 은 둘 다, 두 번째 Stop 은 신선분만."""
+    root = tmp_path / ".omd"
+    write_sentinel(root, "olddeck", time.time() - 7 * 3600)
+    write_sentinel(root, "newdeck", time.time())
+    p1 = run_hook({"cwd": str(tmp_path), "session_id": "s"})
+    assert "olddeck" in p1.stdout and "newdeck" in p1.stdout
+    p2 = run_hook({"cwd": str(tmp_path), "session_id": "s"})
+    assert "newdeck" in p2.stdout
+    assert "olddeck" not in p2.stdout
+
+
+def test_no_session_id_never_suppresses(tmp_path):
+    """d2-4) session_id 없는 payload(구버전 하네스·직접 실행)는 억제하지 않는다
+    — 가시성 쪽으로 fail-open. 기존 테스트 전부가 이 경로라 동작 무변."""
+    root = tmp_path / ".omd"
+    write_sentinel(root, "olddeck", time.time() - 7 * 3600)
+    for _ in range(2):
+        proc = run_hook({"cwd": str(tmp_path)})
+        assert "carried over" in proc.stdout
+
+
+def test_suppression_kill_switch_env(tmp_path):
+    """d2-5) OMD_REMINDER_COOLDOWN_SECONDS<=0 은 HG-3 와 동일하게 이월 억제도
+    끈다 (같은 노이즈-억제 킬스위치 재사용)."""
+    root = tmp_path / ".omd"
+    write_sentinel(root, "olddeck", time.time() - 7 * 3600)
+    env = {"OMD_REMINDER_COOLDOWN_SECONDS": "0"}
+    p1 = run_hook({"cwd": str(tmp_path), "session_id": "sess-1"}, env=env)
+    p2 = run_hook({"cwd": str(tmp_path), "session_id": "sess-1"}, env=env)
+    assert "carried over" in p1.stdout
+    assert "carried over" in p2.stdout

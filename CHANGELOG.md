@@ -15,6 +15,47 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-07-21
+
+### Fixed
+
+- **`clear_sentinels` missed the real slug sentinel when the verify signal ran
+  from inside the slug directory** (D1). A relative-path render (`pdftoppm`)
+  with cwd under `.omd/<slug>/` carries no `.omd/<slug>/` in its command string
+  for `SLUG_RE`, and `<cwd>/.omd` resolved to a nonexistent path, so the clear
+  returned early — the sentinel survived and the Stop guard re-warned all
+  session long (2026-07-21 utracker-seminar incident, 8+ repeats).
+  `docs_verify_emit.py` now derives the project `.omd` root and the slug from
+  the cwd path COMPONENTS (`.omd/<slug>/` or `outputs/<slug>/` anchors —
+  substrings like `test_outputs/` do not match) whenever the command names no
+  slug. A cwd-identified clear removes ONLY that slug's sentinel — the broad
+  fallback was not widened. Commands that do name a slug, and the fully
+  slugless broad fallback, behave exactly as before. Arming from inside the
+  slug directory (same defect class — it used to be skipped silently) now arms
+  the correct slug sentinel.
+- **The Stop guard had no per-turn suppression for carried-over sentinels**
+  (D2). `stop_hook_active` only prevents re-entry inside one Stop, so a
+  carried-over sentinel (no TTL — HK-4) re-warned at EVERY Stop of a session.
+  `docs_stop_guard.py` now announces a given carried-over set (armed_at past
+  `STALE_AFTER`, the same 6h proxy the "carried over" tag uses) once per
+  session, keyed by Stop-payload `session_id` + the stale slug set, stored in
+  the shared HG-3 throttle file (`.omd/.hook-throttle.json`, atomic write).
+  HK-4 ("real carried-over work stays visible") is kept, refined: sentinels
+  still never expire and every new session re-surfaces them at its first Stop;
+  fresh sentinels keep warning at every Stop, unchanged.
+  `OMD_REMINDER_COOLDOWN_SECONDS<=0` disables the suppression (the same HG-3
+  kill switch); payloads without `session_id` are never suppressed (fail-open
+  toward visibility).
+- Verification: 9 new regression tests — 4 × D1 in `tests/test_verify_emit.py`
+  (clear from inside `.omd/<slug>/`, slug-specific clear only,
+  `outputs/<slug>/` cwd, arm from inside the slug dir) and 5 × D2 in
+  `tests/test_stop_guard.py` (once per session + re-notice in a new session,
+  fresh warns every Stop, mixed fresh/stale second Stop, no `session_id` → no
+  suppression, env kill switch). Full suite green: 264 passed, 2 skipped
+  (`python3 -m pytest`, exit 0). Pre-existing no-change guards untouched:
+  slug-in-command clear, slugless broad-fallback clear, slugless 7-day G7
+  expiry, slugged no-TTL (HK-4).
+
 ## [0.6.1] - 2026-07-19
 
 ### Fixed
