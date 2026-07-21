@@ -16,6 +16,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -473,4 +474,69 @@ def test_remote_deploy_pytest_pipeline_stays_silent(tmp_path):
     (tmp_path / ".omd").mkdir()
     out = run_hook(VAULT_INCIDENT_CMD, cwd=str(tmp_path))
     assert out.strip() == ""
+    assert not (tmp_path / ".omd" / ".verify-pending").exists()
+
+
+# ── D1 (v0.6.2): cwd 기반 root/slug 유도 (2026-07-21 utracker-seminar 누수) ──
+# verify 신호(pdftoppm 등)를 .omd/<slug>/ 하위 cwd 에서 상대경로로 실행하면
+# ① 명령 문자열에 slug 가 없고(SLUG_RE 미스) ② root 해석(<cwd>/.omd)마저
+# 존재하지 않는 경로가 되어 clear_sentinels 가 isdir 가드에서 조기 반환 —
+# 진짜 slug 센티널이 살아남아 Stop 가드가 세션 내내 재경고했다. 수정: 명령에
+# slug 단서가 없으면 cwd 경로 성분(.omd/<slug>/ 또는 outputs/<slug>/ 앵커)에서
+# 프로젝트 .omd root 와 slug 를 유도한다. cwd 로 slug 를 특정한 clear 는 그
+# slug 만 지운다(광범위 clear 로 가드 무력화 금지 — 사용자 명시 제약).
+# slug 단서가 어디에도 없으면 기존 광역 폴백 그대로 (동작 무변 —
+# test_clear_removes_all_sentinels_and_stays_silent 가 그 계약을 잠근다).
+
+
+def _plant_sentinel(tmp_path, slug):
+    d = tmp_path / ".omd" / slug
+    d.mkdir(parents=True, exist_ok=True)
+    s = d / ".verify-pending"
+    s.write_text(json.dumps({"armed_at": time.time(),
+                             "command_head": "python3 build_deck.py"}))
+    return s
+
+
+def test_clear_from_inside_slug_dir_relative_render(tmp_path):
+    """D1a) verify 신호를 .omd/<slug>/ 하위 cwd 에서 상대경로로 실행해도 그
+    slug 센티널이 지워진다 — 2026-07-21 사고 재현 형태(렌더 하위 디렉토리)."""
+    sentinel = _plant_sentinel(tmp_path, "utracker-seminar")
+    renders = tmp_path / ".omd" / "utracker-seminar" / "renders"
+    renders.mkdir()
+    out = run_hook("pdftoppm -png -r 150 deck.pdf page", cwd=str(renders))
+    assert out.strip() == ""
+    assert not sentinel.exists()
+
+
+def test_clear_from_slug_cwd_touches_only_that_slug(tmp_path):
+    """D1b) cwd 로 slug 를 특정한 clear 는 그 slug 만 — 다른 slug·루트 센티널은
+    남는다."""
+    target = _plant_sentinel(tmp_path, "mydeck")
+    other = _plant_sentinel(tmp_path, "otherdeck")
+    root_sentinel = tmp_path / ".omd" / ".verify-pending"
+    root_sentinel.write_text(json.dumps({"armed_at": time.time(), "command_head": "x"}))
+    run_hook("unzip -t deck.pptx", cwd=str(tmp_path / ".omd" / "mydeck"))
+    assert not target.exists()
+    assert other.is_file()
+    assert root_sentinel.is_file()
+
+
+def test_clear_from_outputs_slug_cwd(tmp_path):
+    """D1c) outputs/<slug>/ 하위 cwd 도 동일 유도 (SLUG_RE 앵커와 대칭)."""
+    sentinel = _plant_sentinel(tmp_path, "mydeck")
+    workdir = tmp_path / "outputs" / "mydeck" / "current"
+    workdir.mkdir(parents=True)
+    out = run_hook("pdftoppm -png deck.pdf p", cwd=str(workdir))
+    assert out.strip() == ""
+    assert not sentinel.exists()
+
+
+def test_arm_from_inside_slug_dir_arms_that_slug(tmp_path):
+    """D1d) 빌드를 .omd/<slug>/ 안에서 돌려도 그 slug 로 arm 된다 (전에는 root
+    미존재로 무장 자체가 조용히 누락 — 같은 결함 계열의 arm 쪽 증상)."""
+    slug_dir = tmp_path / ".omd" / "mydeck"
+    slug_dir.mkdir(parents=True)
+    run_hook("python3 build_deck.py", cwd=str(slug_dir))
+    assert (slug_dir / ".verify-pending").is_file()
     assert not (tmp_path / ".omd" / ".verify-pending").exists()
