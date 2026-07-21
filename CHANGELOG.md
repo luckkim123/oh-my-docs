@@ -15,6 +15,15 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Two relevance-gate silence tests were not hermetic**: they inherited
+  pytest's cwd, so on a dogfooded checkout (untracked `.omd/` at the repo
+  root) `_has_omd_marker()` forced injection and the silence assertions
+  false-failed (clean worktrees and CI passed -- 2026-07-21 finding while
+  releasing v0.6.2). Both now pin `cwd=tmp_path` like their marker-aware
+  sibling tests already did. Test-only change; hook behavior untouched.
+
 ## [0.6.2] - 2026-07-21
 
 ### Fixed

@@ -260,15 +260,20 @@ def test_gate_off_mode_injects_always():
     assert "STAGE(docs) →" in out
 
 
-def test_gate_on_non_domain_prompt_is_silent():
-    """on + 무관 프롬프트 → 침묵(injection tax 0)."""
-    out = run_hook({"prompt": "hello"}, env=_env(OMD_ROUTE_GATE="on"))
+def test_gate_on_non_domain_prompt_is_silent(tmp_path):
+    """on + 무관 프롬프트 → 침묵(injection tax 0). cwd 는 tmp_path 로 고정 —
+    pytest cwd 를 물려받으면 dogfood 체크아웃의 untracked .omd/ 가
+    _has_omd_marker() 에 걸려 침묵 단정이 오탐된다 (2026-07-21 실측:
+    marker 형제 테스트들은 cwd 를 고정했는데 침묵 단정 2건만 누락돼 있었다)."""
+    out = run_hook({"prompt": "hello"}, cwd=str(tmp_path), env=_env(OMD_ROUTE_GATE="on"))
     assert out.strip() == ""
 
 
-def test_gate_on_word_boundary_no_false_positive():
-    """on + 부분문자열 오탐 금지 — "deck" 이 "decked" 안에서 발동하면 안 된다."""
-    out = run_hook({"prompt": "we decked out the room for the party"}, env=_env(OMD_ROUTE_GATE="on"))
+def test_gate_on_word_boundary_no_false_positive(tmp_path):
+    """on + 부분문자열 오탐 금지 — "deck" 이 "decked" 안에서 발동하면 안 된다.
+    (cwd 고정 이유는 위 테스트와 동일 — 침묵 단정은 marker-free cwd 가 전제.)"""
+    out = run_hook({"prompt": "we decked out the room for the party"},
+                   cwd=str(tmp_path), env=_env(OMD_ROUTE_GATE="on"))
     assert out.strip() == ""
 
 
