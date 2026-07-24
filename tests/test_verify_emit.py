@@ -540,3 +540,127 @@ def test_arm_from_inside_slug_dir_arms_that_slug(tmp_path):
     run_hook("python3 build_deck.py", cwd=str(slug_dir))
     assert (slug_dir / ".verify-pending").is_file()
     assert not (tmp_path / ".omd" / ".verify-pending").exists()
+
+
+# ── v0.6.3: read-only/inspection commands must not arm (2026-07-24 false positive) ──
+# A slugless .verify-pending was armed in a workspace that built NOTHING, by
+# commands that merely NAMED an engine string: (a) a grep whose search PATTERN
+# listed engine strings while investigating the hooks, (b) an openpyxl
+# load-and-print dump of an xlsx template (the live incident: cd; cp a template
+# from a volume; python3 -c 'load_workbook + print'). Neither generates a
+# document, yet both matched a BUILD_SIGNAL substring and armed the root
+# sentinel, so the Stop guard re-warned "(slug unknown)" all session. Same "an
+# engine string named as data is not a build" narrowing as TEST_RUN_RE (v0.5.1).
+
+def test_silent_on_grep_for_engine_strings(tmp_path):
+    """a) grep whose pattern lists engine strings is investigation, not a build."""
+    (tmp_path / ".omd").mkdir()
+    cmd = "grep -rE 'openpyxl|Presentation|soffice|--convert-to' hooks/"
+    assert not is_doc_build(cmd)
+    out = run_hook(cmd, cwd=str(tmp_path))
+    assert out.strip() == ""
+    assert not (tmp_path / ".omd" / ".verify-pending").exists()
+
+
+def test_silent_on_rg_for_engine_strings(tmp_path):
+    """a2) ripgrep is the same shape — a leading read-only viewer."""
+    (tmp_path / ".omd").mkdir()
+    assert not is_doc_build("rg 'from pptx import Presentation' hooks/")
+    assert run_hook("cat hooks/docs_verify_emit.py", cwd=str(tmp_path)).strip() == ""
+
+
+def test_silent_on_readonly_openpyxl_dump(tmp_path):
+    """b) openpyxl load_workbook + print (no write) dumps a template — not a build."""
+    (tmp_path / ".omd").mkdir()
+    cmd = ("python3 -c 'from openpyxl import load_workbook; "
+           "wb=load_workbook(\"template.xlsx\"); print(wb.active.max_row)'")
+    assert not is_doc_build(cmd)
+    out = run_hook(cmd, cwd=str(tmp_path))
+    assert out.strip() == ""
+    assert not (tmp_path / ".omd" / ".verify-pending").exists()
+
+
+def test_silent_on_live_incident_compound(tmp_path):
+    """b2) 2026-07-24 live incident shape verbatim: cd; cp a template from a
+    volume; then dump its cells read-only. A compound `cp` command whose only
+    engine mention is a read-only openpyxl dump must not arm."""
+    (tmp_path / ".omd").mkdir()
+    cmd = ('cd "/tmp/work"\n'
+           '# 템플릿 재확보(cwd 리셋 대비)\n'
+           'cp "/Volumes/ext/herolab-master.xlsx" .\n'
+           "python3 -c 'from openpyxl import load_workbook; "
+           "wb=load_workbook(\"herolab-master.xlsx\"); "
+           "print([c.value for c in wb.active[1]])'")
+    assert not is_doc_build(cmd)
+    out = run_hook(cmd, cwd=str(tmp_path))
+    assert out.strip() == ""
+    assert not (tmp_path / ".omd" / ".verify-pending").exists()
+
+
+def test_openpyxl_edit_and_save_still_builds():
+    """c) a genuine xlsx edit (load_workbook ... .save) IS a build — the write
+    indicator (.save) distinguishes it from a read-only dump. Regression guard."""
+    assert is_doc_build(
+        "python3 -c 'from openpyxl import load_workbook; "
+        "wb=load_workbook(\"t.xlsx\"); wb.save(\"out.xlsx\")'")
+
+
+def test_new_workbook_still_builds():
+    """c2) constructing a new Workbook is unquestionably a build (pinned by
+    test_xlsx_engine_signal_triggers too — restated here beside the narrowing)."""
+    assert is_doc_build("python3 -c 'from openpyxl import Workbook; wb=Workbook()'")
+
+
+def test_real_build_piping_to_tail_still_arms(tmp_path):
+    """c3) the narrowing keys on the LEADING command, so a real build that pipes
+    its log through tail/grep is untouched (leading token is python3, not a
+    read-only viewer)."""
+    (tmp_path / ".omd").mkdir()
+    out = run_hook("python3 outputs/mydeck/build_deck.py 2>&1 | tail -5",
+                   cwd=str(tmp_path))
+    assert (tmp_path / ".omd" / "mydeck" / ".verify-pending").is_file()
+    assert out.strip() != ""
+
+
+# ── v0.6.3 code-review findings (2026-07-24 adversarial review) ──────────────
+
+def test_readonly_lead_re_is_not_redos():
+    """HIGH: READONLY_LEAD_RE must not catastrophically backtrack — a leading
+    `cd a && `×N chain plus a trailing engine string used to hang is_doc_build
+    (~6s at 200 chars). main() runs is_doc_build outside try/except, so a hang
+    freezes the turn. The DIR class excludes space to keep matching linear."""
+    import time as _t
+    # A leading `cd`-chain with NO viewer at the end is the worst case: the regex
+    # must scan the whole chain and then FAIL to find a viewer. The old class
+    # (space-inclusive) explored every chain partition on that failure (~6s @ 200
+    # chars); the fix keeps the failing scan linear. The boolean result is
+    # immaterial here (it is True — a bare engine token is not a read-only
+    # inspection); the ReDoS property is purely latency.
+    cmd = "cd a && " * 40 + "openpyxl"      # 328 chars — old regex: many seconds
+    start = _t.perf_counter()
+    is_doc_build(cmd)
+    elapsed = _t.perf_counter() - start
+    assert elapsed < 0.5, f"is_doc_build took {elapsed:.3f}s — backtracking regression"
+
+
+def test_silent_on_head_tail_git_grep_inspection(tmp_path):
+    """MEDIUM: the natural investigation prefixes named in the fix (head/tail,
+    git grep) must not arm — these directly recur the incident this PR targets."""
+    (tmp_path / ".omd").mkdir()
+    for cmd in (
+        "head -50 render_openpyxl.py",
+        "tail -20 build_deck.log",
+        "git grep -n 'from pptx import Presentation'",
+        "cd hooks && grep -rE 'openpyxl|--convert-to' .",
+    ):
+        assert not is_doc_build(cmd), cmd
+        assert run_hook(cmd, cwd=str(tmp_path)).strip() == "", cmd
+    assert not (tmp_path / ".omd" / ".verify-pending").exists()
+
+
+def test_openpyxl_save_with_space_still_builds():
+    """LOW: `.save (` spacing is still a write — XLSX_WRITE_RE tolerates the
+    space so a genuine save is not silenced as a read-only dump."""
+    assert is_doc_build(
+        "python3 -c 'from openpyxl import load_workbook; "
+        "wb=load_workbook(\"t.xlsx\"); wb.save (\"o.xlsx\")'")
