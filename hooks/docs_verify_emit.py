@@ -61,6 +61,56 @@ RUN_SCRIPT_RE = re.compile(
 # finding, 2026-07-16) and silence a genuine build.
 TEST_RUN_RE = re.compile(r"(?:^|[\s;|&])(?:pytest|unittest)(?:[\s;|&]|$)")
 
+# v0.6.3: read-only / inspection commands merely NAME an engine string; they do
+# not run it to generate a document. A slugless .verify-pending was armed in a
+# workspace that built nothing by exactly this (2026-07-24): a grep whose search
+# pattern listed engine strings while investigating the hooks, and a `cp`
+# compound whose only engine mention was an openpyxl load-and-print dump of an
+# xlsx template. Same "an engine string as data is not a build" narrowing as
+# TEST_RUN_RE — keyed on the LEADING command so a real build that pipes its log
+# through tail/grep is untouched.
+# NOTE: the DIR class is `[^\s;&|]+` (space EXCLUDED) on purpose — a class that
+# also matched space would overlap the adjacent `\s+`/`\s*`, and the outer `*`
+# then explodes into catastrophic backtracking (a 200-char `cd a && …` command
+# hung is_doc_build ~6s; main() runs it outside try/except, so a hang freezes the
+# PostToolUse turn — fail-open cannot catch a hang). Excluding space makes every
+# quantifier's class disjoint from its neighbour's, so matching is linear.
+# ponytail: leading-anchored, so it covers the natural investigation shapes
+# (grep/rg/cat/head/tail, `git grep`, one or more `cd DIR &&`). Exotic prefixes
+# (`sudo grep`, `time grep`, `LC_ALL=C grep`, `( grep …`) still leak through and
+# re-arm — accepted ceiling; widen the prefix set here if one shows up in the wild.
+READONLY_LEAD_RE = re.compile(
+    r"^\s*"
+    r"(?:cd\s+[^\s;&|]+\s*(?:&&|;)\s*)*"                 # optional leading `cd DIR &&|;`
+    r"(?:git\s+)?"                                        # optional `git ` (git grep)
+    r"(?:grep|rg|egrep|fgrep|ag|ack|cat|bat|less|more|head|tail)\b"
+)
+# openpyxl write intent: a genuine xlsx build constructs (Workbook()), edits and
+# saves (.save), or uses xlsxwriter; a bare load_workbook + read is inspection.
+# `\bWorkbook\b` does NOT match inside `load_workbook` (no word boundary at `_W`),
+# so a read-only dump that says only `load_workbook` stays read-only. `\.save\s*\(`
+# tolerates `wb.save (…)` spacing.
+XLSX_WRITE_RE = re.compile(r"\bWorkbook\b|\.save\s*\(|xlsxwriter|create_sheet")
+
+
+def is_readonly_inspection(command: str) -> bool:
+    """True when the command only READS/searches, so an engine string in it is
+    data (grep pattern, file arg) rather than a build. Two shapes seen in the
+    wild (2026-07-24 false positive): a leading text viewer (grep/cat/rg/…), and
+    an openpyxl load_workbook dump with no write indicator.
+    ponytail known ceilings (accepted — the missed-build direction is advisory,
+    the codebase's stated safe side): a leading viewer guarding an inline `-c`
+    engine build (`grep q f && python3 -c '…Presentation().save()'`) is silenced
+    (a doc-NAMED script after the viewer still arms, via runs_doc_script); and a
+    non-load_workbook read (`import openpyxl; print(openpyxl.__version__)`) still
+    arms. Both are low-likelihood; widen only if they surface."""
+    if READONLY_LEAD_RE.match(command):
+        return True
+    if "load_workbook" in command and not XLSX_WRITE_RE.search(command):
+        return True
+    return False
+
+
 # G1: verify-pending sentinel handshake — armed on build, cleared on a
 # verify-signal command, enforced (advisory) by hooks/docs_stop_guard.py at Stop.
 VERIFY_SIGNALS = ("pdftoppm", "unzip -t", "markdownlint")
@@ -183,7 +233,11 @@ def is_doc_build(command: str) -> bool:
         return False
     if TEST_RUN_RE.search(command):
         return False  # test runs never build a deliverable (v0.5.1)
-    has_signal = any(sig in command for sig in BUILD_SIGNALS)
+    # v0.6.3: an engine string named as data (grep pattern, read-only openpyxl
+    # dump) is not a build — it nullifies the signal, but a doc-named script run
+    # (RUN_SCRIPT_RE, e.g. `build_deck.py | tail`) still counts.
+    has_signal = (any(sig in command for sig in BUILD_SIGNALS)
+                  and not is_readonly_inspection(command))
     m = RUN_SCRIPT_RE.search(command)
     name = m.group(1).lower() if m else ""
     runs_doc_script = bool(m) and not (name.startswith("test_") or name.endswith("_test.py"))

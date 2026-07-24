@@ -15,14 +15,54 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-07-24
+
 ### Fixed
 
+- **`docs_verify_emit` armed a `verify-pending` sentinel on read-only commands
+  that merely NAMED an engine string** (arm-side false positive, the sibling
+  axis to v0.6.2's clear-side leak). `is_doc_build` fired whenever a
+  `BUILD_SIGNALS` substring appeared, with no check that the command actually
+  runs the engine — so in a workspace with an existing `.omd/`, a grep whose
+  search pattern listed engine strings (`grep -E 'openpyxl|Presentation|
+  --convert-to' hooks/`) and an openpyxl load-and-print dump of an xlsx
+  template (the 2026-07-24 live incident: `cd; cp` a template from a volume;
+  `python3 -c 'load_workbook(...); print(...)'`) both armed a slugless root
+  sentinel, and the Stop guard re-warned `(slug unknown)` all session.
+  `is_doc_build` now nullifies the engine signal when the command is a
+  read-only inspection — a leading text viewer (`grep`/`rg`/`egrep`/`cat`/
+  `bat`/`less`/`head`/`tail`/… , past optional `cd DIR &&` and an optional
+  `git ` for `git grep`), or an `openpyxl` `load_workbook` with no write
+  indicator (`Workbook()`/`.save(`/`xlsxwriter`/`create_sheet`). A doc-named
+  script run (`RUN_SCRIPT_RE`, e.g. `build_deck.py | tail`) still counts, and a
+  genuine slugless build (`python3 build_deck.py`) still arms the root sentinel
+  — the deliberate design v0.5.1 pinned, with G7's 7-day self-expiry as its
+  safety net — so this narrows the *non-build* case only, the same intent as
+  `TEST_RUN_RE`. The viewer regex's directory class excludes whitespace so a
+  long `cd a && …` chain cannot trigger catastrophic backtracking (a 200-char
+  command hung `is_doc_build` ~6 s before the fix; `main()` runs it outside the
+  fail-open envelope, so a hang would have frozen the turn). Known accepted
+  ceilings (documented in-code): an exotic viewer prefix (`sudo`/`time`/
+  `LC_ALL=C`/subshell) still re-arms, and a leading viewer guarding an inline
+  `python3 -c` engine build is silenced — both low-likelihood, the
+  advisory-safe direction. No clear-side or slug-context change.
 - **Two relevance-gate silence tests were not hermetic**: they inherited
   pytest's cwd, so on a dogfooded checkout (untracked `.omd/` at the repo
   root) `_has_omd_marker()` forced injection and the silence assertions
   false-failed (clean worktrees and CI passed -- 2026-07-21 finding while
   releasing v0.6.2). Both now pin `cwd=tmp_path` like their marker-aware
   sibling tests already did. Test-only change; hook behavior untouched.
+- Verification: 10 new regression tests in `tests/test_verify_emit.py` — the
+  false-positive shapes stay silent and arm nothing (grep for engine strings,
+  ripgrep/cat, `head`/`tail`/`git grep`, read-only openpyxl dump, and the live
+  `cd; cp; load_workbook` compound), while genuine builds still fire (openpyxl
+  edit-and-save incl. `.save (` spacing, `Workbook()` construction,
+  `build_deck.py` piping to `tail`); plus a latency guard asserting the viewer
+  regex stays sub-500 ms on a 328-char `cd a && …` chain (ReDoS regression).
+  Post-review adversarial pass (2026-07-24) reproduced and closed the
+  backtracking hang and the `head`/`tail`/`git grep` prefix gap. Full suite
+  green: 274 passed, 2 skipped (`tests/test_verify_emit.py` +
+  `tests/test_stop_guard.py`: 72 passed).
 
 ## [0.6.2] - 2026-07-21
 
