@@ -15,6 +15,89 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-07-27
+
+### Fixed
+
+- **A verify RENDER armed the very sentinel it was producing evidence for**
+  (build/verify inversion). `BUILD_SIGNALS` holds `--convert-to`, but that flag
+  carries two meanings and the knowledge cards draw the line by OUTPUT PATH: a
+  delivery conversion "never mutates the source — write to `outputs/<slug>/`"
+  (`references/conversions.md`, Rules), while the "Render-to-PNG recipe (used by
+  verify/inspect for proofreading)" converts into a scratch `<dir>`
+  (`references/formats/pptx.md`·`docx.md`·`xlsx.md`). `VERIFY_SIGNALS` names
+  only `pdftoppm`/`unzip -t`/`markdownlint`/`mkdocs --strict`, so a soffice
+  integrity render scored `is_verify_run() == False, is_doc_build() == True` and
+  ARMED — defeating the verify-first check `main()` performs precisely to stop
+  re-arming. Live 2026-07-24 case (recovered verbatim from the session
+  transcript): a one-off `.docx` rendered to PDF in `$CLAUDE_JOB_DIR/tmp` to
+  count pages. `is_readonly_inspection` now also answers True for a convert
+  whose `--outdir` resolves outside `outputs/`, with one level of `NAME=value`
+  lookup inside the same command so `--outdir "$OUTDIR"` is judged on the path
+  it holds, not on the variable name. Narrowing the convert-family signal alone
+  would NOT have covered the incident — its trailing `echo` also names
+  `python-docx` — so the whole signal route yields to the inspection verdict,
+  while the doc-named script route (`build_deck.py`) still arms, as v0.6.3
+  established. A convert with no `--outdir` writes beside its source and is
+  still a build (unchanged).
+- **The Bash arm path had no slug-context requirement, so it planted
+  unactionable slugless sentinels.** `arm_sentinel`'s comment claimed to mirror
+  `handle_md_edit`'s "no slug context → not an omd pipeline artifact" rule while
+  the code only checked that `.omd/` existed, then wrote a ROOT sentinel
+  whenever `SLUG_RE`/cwd yielded nothing. In a workspace holding unrelated
+  `.omd/` projects, a command touching a document outside the pipeline armed a
+  marker the Stop guard could only report as `(slug unknown)` — a warning whose
+  single prescribed remedy (`docs-verify`) requires a slug, and which
+  `clear_sentinels` would never remove there. `arm_sentinel` now returns without
+  a slug (from the command string or cwd). The PostToolUse build reminder still
+  fires for slugless builds, so the "verify before declaring done" nudge is
+  intact; only the Stop-level tracker, which needs a target to be actionable,
+  now requires one. This reverses the v0.5.1 slugless-arm contract that v0.6.3
+  deliberately kept — measured cost accepted, see the trade-off note below.
+- **G7's 7-day TTL replaced by an on-sight purge (upgrade migration).** With the
+  source of slugless sentinels removed, any found on disk is legacy state, so
+  `expire_stale_slugless` becomes `purge_slugless_sentinel`: remove it
+  immediately with one notice instead of after `SLUGLESS_EXPIRE_AFTER`. The TTL
+  was the wrong shape for an upgrade — the 2026-07-24 marker was still firing on
+  2026-07-27 through two releases, which is what made this read as "fixed twice
+  and it is still here". `pending_sentinels` no longer emits a `(slug unknown)`
+  row at all. The incident G7 guarded (2026-07-15 vault: a misclassified command
+  planting a permanent sentinel in a repo with no document history) is now
+  structurally impossible rather than time-limited, and is pinned by a test.
+- **The Stop message contradicted its own contents**: it asserted "이 세션에서
+  빌드된 문서 중" while listing items tagged `carried over from an earlier
+  session` (three days old, another session). Header no longer claims this
+  session.
+- **A stale sentinel could not explain itself.** Diagnosing the 2026-07-24
+  marker took a session-transcript dig because `command_head` was 80 characters
+  consumed entirely by one absolute path, and nothing recorded WHY it armed.
+  Sentinels now carry a `signal` field naming the rule that armed them
+  (`script:build_deck.py`, `signal:--convert-to`, `md-edit`), and the head is
+  200 characters. `is_doc_build` keeps its signature as the boolean face of the
+  new `build_reason`.
+- Trade-off accepted (slug requirement): a build whose command carries no slug
+  clue anywhere — `python3 build_deck.py` run from a project root, the shape
+  `test_arm_writes_global_sentinel_when_slug_unknown` used to pin — no longer
+  gets a Stop-time sentinel. It still gets the build reminder. The alternative
+  (keep arming a marker nobody can act on and nothing can clear) is what this
+  release exists to remove; the pipeline's own layout contract puts every real
+  deliverable under `outputs/<slug>/`, and the cwd fallback (D1) covers builds
+  run from inside a slug directory.
+- Verification: 12 new/rewritten regression tests across
+  `tests/test_verify_emit.py` and `tests/test_stop_guard.py` — the incident
+  command verbatim arms nothing, a scratch render inside a slug context does not
+  re-arm, `--outdir "$OUTDIR"` is resolved rather than taken literally, and the
+  vault-incident class cannot arm without a TTL; while delivery conversion into
+  `outputs/<slug>/`, a convert with no `--outdir`, a doc-named script alongside
+  a scratch render, and cwd-derived slugs all still arm. Measured A/B on the
+  2026-07-24 command through the hook process: v0.6.3 arms
+  `.omd/.verify-pending` and fires the reminder, this build arms nothing and
+  stays silent. ReDoS latency guard over the new regexes (400-char `--outdir`
+  separator runs, a 300-deep variable chain, the incident command ×50): worst
+  case 1.5 ms, well under the 500 ms budget — `main()` calls `is_doc_build`
+  outside the fail-open envelope, so a hang would freeze the turn. Full suite
+  green: 285 passed, 2 skipped.
+
 ## [0.6.3] - 2026-07-24
 
 ### Fixed
