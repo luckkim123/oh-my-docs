@@ -56,7 +56,8 @@ def purge_slugless_sentinel(root: str):
         return None
     return (
         "[OMD verify-pending] slug 없는 구버전 verify-pending 센티널을 제거했습니다 "
-        "(v0.6.4부터 slug 컨텍스트 없이는 무장하지 않습니다 — 이 경고는 다시 뜨지 않습니다)."
+        "(v0.6.4부터 slug 컨텍스트 없이는 무장하지 않습니다). 이후로도 이 고지가 "
+        "반복되면 구버전 emit 훅이 함께 등록돼 계속 무장시키고 있다는 뜻입니다."
     )
 
 

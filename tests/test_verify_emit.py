@@ -23,7 +23,7 @@ from typing import Optional
 import pytest
 
 import hooks.docs_verify_emit as mod
-from hooks.docs_verify_emit import is_doc_build
+from hooks.docs_verify_emit import build_reason, is_doc_build
 
 HOOK = Path(__file__).parent.parent / "hooks" / "docs_verify_emit.py"
 
@@ -653,6 +653,44 @@ def test_readonly_lead_re_is_not_redos():
     is_doc_build(cmd)
     elapsed = _t.perf_counter() - start
     assert elapsed < 0.5, f"is_doc_build took {elapsed:.3f}s — backtracking regression"
+
+
+def test_new_regexes_have_no_catastrophic_backtracking():
+    """v0.6.4: the v0.6.3 hang shipped because a regex with overlapping adjacent
+    classes ran on every Bash command from OUTSIDE main()'s fail-open envelope —
+    a hang there freezes the turn, so latency is a correctness property, not a
+    performance nicety. v0.6.4 adds OUTDIR_RE, VAR_REF_RE, the dynamically built
+    `NAME=(\\S+)` lookup and SECRET_ASSIGN_RE, and widens the exposure: the
+    inspection check now runs on every non-test, non-doc-script command rather
+    than only on ones already carrying a BUILD_SIGNAL. Pin the invariant with a
+    measurement instead of a comment (review finding)."""
+    import time as _t
+    cases = (
+        "soffice --convert-to pdf --outdir" + "=" * 20000 + " x.docx",
+        "soffice --convert-to pdf --outdir" + " " * 20000 + '"$X" a.docx',
+        "OUT=" * 10000 + 'soffice --convert-to pdf --outdir "$OUT" a.docx',
+        "\n".join('V%d="$V%d/tmp"' % (i, i - 1) for i in range(300))
+        + '\nsoffice --convert-to pdf --outdir "$V299" a.docx',
+        "A" * 5000 + "_KEY=" + "b" * 5000,
+    )
+    for cmd in cases:
+        start = _t.perf_counter()
+        build_reason(cmd)
+        elapsed = _t.perf_counter() - start
+        assert elapsed < 0.5, f"{elapsed:.3f}s on {cmd[:40]!r} — backtracking"
+
+
+def test_secret_assignment_is_redacted_from_the_marker(tmp_path):
+    """The head is meant to be pasted into a diagnosis; widening it to 200 chars
+    widened what an inline `export …_API_KEY=… && build` leaves in it."""
+    slug = _with_slug(tmp_path, "mydeck")
+    run_hook("export ANTHROPIC_API_KEY=sk-ant-verysecret1234567890 && "
+             "python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
+    head = json.loads(
+        (tmp_path / ".omd" / slug / ".verify-pending").read_text())["command_head"]
+    assert "sk-ant-verysecret1234567890" not in head
+    assert "<redacted>" in head
+    assert "build_deck.py" in head  # the diagnostic part survives
 
 
 def test_silent_on_head_tail_git_grep_inspection(tmp_path):

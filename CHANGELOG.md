@@ -109,7 +109,8 @@ SSOT: `.claude-plugin/plugin.json` `version`.
   release exists to remove; the pipeline's own layout contract puts every real
   deliverable under `outputs/<slug>/`, and the cwd fallback (D1) covers builds
   run from inside a slug directory.
-- Verification: 22 added/rewritten test functions across
+- Verification: 24 added/renamed test functions (measured `+def test_` against
+  main), plus in-place rewrites of the contracts v0.6.3 pinned, across
   `tests/test_verify_emit.py` and `tests/test_stop_guard.py` — the incident
   command verbatim arms nothing, a scratch render inside a slug context does not
   re-arm, `--outdir "$OUTDIR"` is resolved rather than taken literally, and
@@ -136,7 +137,16 @@ SSOT: `.claude-plugin/plugin.json` `version`.
   workspace hole above. All are fixed and pinned. One reported case is
   intentional, not a defect: `--outdir "$HOME/my outputs/mydeck/"` is a
   directory named `my outputs`, which is not the pipeline's `outputs/`
-  component, so it reads as scratch.
+  component, so it reads as scratch. Three further review points are also
+  addressed: widening `command_head` widened what an inline
+  `export …_API_KEY=… && build` leaves in a marker meant to be pasted into a
+  diagnosis, so secret-named assignments are now redacted (after truncation, so
+  the scan stays bounded); the purge notice no longer promises the warning
+  "cannot return", which is false if an older emit hook is still registered
+  alongside; and the disjoint-class latency invariant is pinned by a
+  measurement over the new regexes rather than by a comment — the inspection
+  check now runs on every non-test, non-doc-script command, a wider exposure
+  than v0.6.3's, where it ran only behind an `and` on a BUILD_SIGNALS hit.
 
 ## [0.6.3] - 2026-07-24
 

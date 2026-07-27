@@ -249,6 +249,15 @@ def _slug_of(command, cwd):
 
 HEAD_CHARS = 200  # v0.6.4: 80 was consumed by one absolute path in the
 # 2026-07-27 marker, so the head said nothing about why it armed.
+# Widening the head widened what an inline `export FOO_API_KEY=… && build`
+# leaves behind in a marker whose whole purpose is to be pasted into a
+# diagnosis (review finding). Redact value-looking assignments to secret-named
+# variables. Applied AFTER truncation, so the scan is bounded to HEAD_CHARS and
+# the pattern's `\w*` cannot become a latency problem; a value cut mid-token
+# still matches its `NAME=` prefix and is redacted too.
+SECRET_ASSIGN_RE = re.compile(
+    r"(\w*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|CRED|AUTH)\w*\s*=)\S+",
+    re.IGNORECASE)
 
 
 def _write_sentinel(path, head, signal=""):
@@ -256,7 +265,8 @@ def _write_sentinel(path, head, signal=""):
     records WHICH rule armed it (v0.6.4), so a stale marker explains itself
     instead of needing a session-transcript dig to diagnose."""
     atomic_write_json(path, {"armed_at": time.time(),
-                             "command_head": head[:HEAD_CHARS],
+                             "command_head": SECRET_ASSIGN_RE.sub(
+                                 r"\1<redacted>", head[:HEAD_CHARS]),
                              "signal": signal})
 
 

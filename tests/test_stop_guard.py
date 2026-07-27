@@ -156,6 +156,7 @@ def test_legacy_slugless_sentinel_purged_on_sight(tmp_path):
     assert proc.returncode == 0
     message = json.loads(proc.stdout)["systemMessage"]  # stdout is \u-escaped JSON
     assert "제거" in message
+    assert "다시 뜨지 않습니다" not in message  # 구버전 emit 훅 공존 시 거짓 (review)
     assert "(slug unknown)" not in message
     assert not (root / ".verify-pending").exists()
     proc2 = run_hook({"cwd": str(tmp_path)})
