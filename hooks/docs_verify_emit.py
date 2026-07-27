@@ -103,8 +103,20 @@ XLSX_WRITE_RE = re.compile(r"\bWorkbook\b|\.save\s*\(|xlsxwriter|create_sheet")
 # $CLAUDE_JOB_DIR/tmp armed a sentinel that outlived two releases.
 # No --outdir at all → soffice writes beside the source; still a build
 # (unchanged, pinned by test_fires_on_convert).
-OUTDIR_RE = re.compile(r"--outdir[=\s]+(\S+)")
+OUTDIR_RE = re.compile(r"--outdir[=\s]+(\"[^\"]*\"|'[^']*'|\S+)")
 VAR_REF_RE = re.compile(r"^\$\{?(\w+)\}?")
+# Signals that can appear WITHOUT the engine actually running: the convert
+# family (two meanings — see is_scratch_render) and the pip PACKAGE names, which
+# are not importable identifiers. `python-docx` can only occur in prose, a
+# comment or a `pip install`; executing code says `from docx`/`import docx`.
+# The 2026-07-24 command names `python-docx` in its fallback echo, which is why
+# a scratch render has to discount these. Every OTHER signal (`from pptx`,
+# `Presentation(`, `openpyxl`, `mkdocs build`, …) means the engine really runs,
+# so a build stays a build even when the same command also renders a throwaway
+# copy (adversarial review finding, 2026-07-27 — nullifying the whole signal
+# route silenced `python3 -c '…Presentation()…' && soffice --outdir /tmp`).
+NON_EXEC_SIGNALS = ("soffice --convert", "libreoffice --convert", "--convert-to",
+                    "python-pptx", "python-docx")
 
 
 def _resolve_shell_var(value: str, command: str) -> str:
@@ -123,19 +135,34 @@ def _resolve_shell_var(value: str, command: str) -> str:
     return assign.group(1).strip("\"'") + v[m.end():] if assign else v
 
 
+def _is_delivery_outdir(value: str, command: str) -> bool:
+    """True when the resolved --outdir carries an `outputs` path COMPONENT — the
+    layout contract for a delivery conversion. Component-wise rather than
+    substring so a `my-outputs/` directory is not mistaken for the delivery
+    tree, and backslash-normalised so a Windows `C:\\proj\\outputs\\mydeck`
+    reads like its POSIX form (review findings: that form and a bare
+    `--outdir outputs` were both misread as scratch)."""
+    resolved = _resolve_shell_var(value, command).replace("\\", "/")
+    return "outputs" in resolved.split("/")
+
+
 def is_scratch_render(command: str) -> bool:
-    """A convert whose --outdir resolves outside `outputs/` renders a throwaway
-    copy for inspection, not a deliverable."""
-    m = OUTDIR_RE.search(command)
-    return bool(m) and "outputs/" not in _resolve_shell_var(m.group(1), command)
+    """True when the command's convert output goes somewhere other than the
+    delivery tree. ANY --outdir naming outputs/ makes it a delivery, so a
+    `render to /tmp && convert into outputs/` compound is still a build (review
+    finding). No --outdir at all → soffice writes beside its source, so not
+    scratch (unchanged, pinned by test_fires_on_convert)."""
+    values = OUTDIR_RE.findall(command)
+    return bool(values) and not any(_is_delivery_outdir(v, command) for v in values)
 
 
 def is_readonly_inspection(command: str) -> bool:
-    """True when the command INSPECTS rather than produces a deliverable, so an
-    engine string in it is data (grep pattern, file arg) or the engine only
-    renders a throwaway copy. Three shapes seen in the wild: a leading text
-    viewer (grep/cat/rg/…) and an openpyxl load_workbook dump with no write
-    indicator (2026-07-24), plus a convert into a scratch --outdir (2026-07-27).
+    """True when the command only READS/searches, so an engine string in it is
+    data (grep pattern, file arg) rather than a build. Two shapes seen in the
+    wild (2026-07-24 false positive): a leading text viewer (grep/cat/rg/…), and
+    an openpyxl load_workbook dump with no write indicator. (The scratch-render
+    shape is handled in build_reason instead — it must discount only the signals
+    that can appear without the engine running, not every signal.)
     ponytail known ceilings (accepted — the missed-build direction is advisory,
     the codebase's stated safe side): a leading viewer guarding an inline `-c`
     engine build (`grep q f && python3 -c '…Presentation().save()'`) is silenced
@@ -145,8 +172,6 @@ def is_readonly_inspection(command: str) -> bool:
     if READONLY_LEAD_RE.match(command):
         return True
     if "load_workbook" in command and not XLSX_WRITE_RE.search(command):
-        return True
-    if is_scratch_render(command):
         return True
     return False
 
@@ -240,17 +265,26 @@ def arm_sentinel(root, command, cwd="", signal=""):
     # fabricate .omd/ in a repo the pipeline has not touched.
     if not os.path.isdir(root):
         return
-    # v0.6.4: and only WITH slug context — now actually mirroring
-    # handle_md_edit's "no slug context -> not an omd pipeline artifact" rule,
-    # which the comment here claimed while the code still wrote a slugless ROOT
-    # sentinel. A sentinel names the workspace to go verify; with no slug the
-    # Stop guard could only say "(slug unknown)", which no docs-verify run can
-    # act on and no clear_sentinels call in such a workspace would ever remove
-    # (the 2026-07-24 marker was still warning three days and two releases
-    # later). The build reminder still fires for slugless builds — only the
-    # Stop-level tracker needs an actionable target.
+    # v0.6.4: and only with slug context — the SAME test handle_md_edit makes,
+    # which the comment here claimed while the code wrote a slugless ROOT
+    # sentinel for any command and fabricated .omd/<slug>/ for any string that
+    # merely looked like one.
+    #   no slug at all → the Stop guard could only say "(slug unknown)", which
+    #     no docs-verify run can act on and no clear_sentinels call in that
+    #     workspace would ever remove (the 2026-07-24 marker was still warning
+    #     three days and two releases later);
+    #   slug with no .omd/<slug>/ workspace → not an omd pipeline artifact.
+    #     `outputs/<name>/` is a prefix other tools own too — Hydra/PyTorch
+    #     write runs there — so mining a slug out of it and mkdir-ing a
+    #     workspace for it planted a permanent, unclearable marker in repos omd
+    #     never touched. That is the 2026-07-15 vault incident wearing a slug
+    #     instead of the root sentinel, and no TTL covers the slugged form
+    #     (HK-4). Existence of .omd/<slug>/ is the only evidence omd manages
+    #     this slug (adversarial review finding, 2026-07-27).
+    # The build reminder still fires either way — only the Stop-level tracker,
+    # which needs an actionable target, requires the workspace.
     slug = _slug_of(command, cwd)
-    if not slug:
+    if not slug or not os.path.isdir(os.path.join(root, slug)):
         return
     _write_sentinel(os.path.join(root, slug, SENTINEL), command, signal)
 
@@ -282,7 +316,9 @@ def build_reason(command: str):
         own recipe, which often names neither the engine nor a .pptx inline; or
     (b) an explicit engine/convert signal (`from pptx`, `--convert-to`, …), unless
         the command only inspects (is_readonly_inspection) — an engine string
-        named as data, or a convert rendering to scratch, is not a build.
+        named as data is not a build — or the signal is one that can appear
+        without the engine running while the command renders to scratch
+        (NON_EXEC_SIGNALS).
     Read-only renders/checks (pdftoppm, unzip -t) and unrelated scripts
     (`python3 analyze_runs.py`) match neither and stay silent (noise control)."""
     if not command:
@@ -297,8 +333,9 @@ def build_reason(command: str):
         return "script:" + m.group(1)
     if is_readonly_inspection(command):
         return None
+    ignored = NON_EXEC_SIGNALS if is_scratch_render(command) else ()
     for sig in BUILD_SIGNALS:
-        if sig in command:
+        if sig in command and sig not in ignored:
             return "signal:" + sig
     return None
 

@@ -31,15 +31,21 @@ SSOT: `.claude-plugin/plugin.json` `version`.
   ARMED — defeating the verify-first check `main()` performs precisely to stop
   re-arming. Live 2026-07-24 case (recovered verbatim from the session
   transcript): a one-off `.docx` rendered to PDF in `$CLAUDE_JOB_DIR/tmp` to
-  count pages. `is_readonly_inspection` now also answers True for a convert
-  whose `--outdir` resolves outside `outputs/`, with one level of `NAME=value`
-  lookup inside the same command so `--outdir "$OUTDIR"` is judged on the path
-  it holds, not on the variable name. Narrowing the convert-family signal alone
-  would NOT have covered the incident — its trailing `echo` also names
-  `python-docx` — so the whole signal route yields to the inspection verdict,
-  while the doc-named script route (`build_deck.py`) still arms, as v0.6.3
-  established. A convert with no `--outdir` writes beside its source and is
-  still a build (unchanged).
+  count pages. `build_reason` now discounts `NON_EXEC_SIGNALS` — the convert
+  family plus the pip PACKAGE names `python-pptx`/`python-docx` — when the
+  command renders to scratch. Package names are not importable identifiers, so
+  they only ever occur in prose, a comment or a `pip install`; the incident's
+  fallback `echo` names `python-docx`, which is why narrowing the convert family
+  alone would not have covered it. Every other signal (`from pptx`,
+  `Presentation(`, `openpyxl`, `mkdocs build`, …) means the engine really runs,
+  so a build stays a build even when the same command also renders a throwaway
+  copy. Scratch-vs-delivery is decided on the `--outdir` value: one level of
+  `NAME=value` lookup inside the same command (so `--outdir "$OUTDIR"` is judged
+  on the path it holds), quoted values kept intact, backslashes normalised, and
+  an `outputs` path COMPONENT — not a substring, so `my-outputs/` is somebody
+  else's directory. EVERY `--outdir` in the command is examined, so a
+  check-render followed by the real conversion still arms. A convert with no
+  `--outdir` writes beside its source and is still a build (unchanged).
 - **The Bash arm path had no slug-context requirement, so it planted
   unactionable slugless sentinels.** `arm_sentinel`'s comment claimed to mirror
   `handle_md_edit`'s "no slug context → not an omd pipeline artifact" rule while
@@ -63,7 +69,27 @@ SSOT: `.claude-plugin/plugin.json` `version`.
   and it is still here". `pending_sentinels` no longer emits a `(slug unknown)`
   row at all. The incident G7 guarded (2026-07-15 vault: a misclassified command
   planting a permanent sentinel in a repo with no document history) is now
-  structurally impossible rather than time-limited, and is pinned by a test.
+  structurally impossible rather than time-limited — but only in combination
+  with the workspace requirement below; the slug requirement alone would have
+  let the same incident return wearing a slug, a form no TTL ever covered. Both
+  are pinned by tests.
+- **`arm_sentinel` fabricated a `.omd/<slug>/` workspace for any string that
+  merely looked like a slug** — found by the independent review pass, and it
+  falsified the claim above as first written. `outputs/<name>/` is a prefix
+  other tools own: Hydra and PyTorch write runs to `outputs/<run>/`. In a repo
+  holding an `.omd/` for one real deck, a command naming `Document(` (a
+  `BUILD_SIGNALS` member, and also langchain's API) over a run directory mined
+  `<run>` as a slug, `mkdir`-ed `.omd/<run>/` through the atomic writer's parent
+  creation, and planted a SLUGGED sentinel — which `purge_slugless_sentinel`
+  does not touch, which `clear_sentinels` only removes for the slug a verify
+  command names, and which HK-4 forbids expiring. That is the 2026-07-15
+  incident with a slug instead of the root sentinel, and v0.6.4 had just deleted
+  G7, the only cleanup in the family. `arm_sentinel` now also requires
+  `.omd/<slug>/` to exist — the test `handle_md_edit` has always made, and the
+  one this hook's own comment claimed to mirror. Cost: the first office build of
+  a brand-new slug, run before any stage creates its workspace, arms nothing at
+  Stop — the same trade-off D5 already accepted for the Edit path, and the build
+  reminder still fires.
 - **The Stop message contradicted its own contents**: it asserted "이 세션에서
   빌드된 문서 중" while listing items tagged `carried over from an earlier
   session` (three days old, another session). Header no longer claims this
@@ -83,20 +109,34 @@ SSOT: `.claude-plugin/plugin.json` `version`.
   release exists to remove; the pipeline's own layout contract puts every real
   deliverable under `outputs/<slug>/`, and the cwd fallback (D1) covers builds
   run from inside a slug directory.
-- Verification: 12 new/rewritten regression tests across
+- Verification: 22 added/rewritten test functions across
   `tests/test_verify_emit.py` and `tests/test_stop_guard.py` — the incident
   command verbatim arms nothing, a scratch render inside a slug context does not
-  re-arm, `--outdir "$OUTDIR"` is resolved rather than taken literally, and the
-  vault-incident class cannot arm without a TTL; while delivery conversion into
-  `outputs/<slug>/`, a convert with no `--outdir`, a doc-named script alongside
-  a scratch render, and cwd-derived slugs all still arm. Measured A/B on the
-  2026-07-24 command through the hook process: v0.6.3 arms
-  `.omd/.verify-pending` and fires the reminder, this build arms nothing and
-  stays silent. ReDoS latency guard over the new regexes (400-char `--outdir`
-  separator runs, a 300-deep variable chain, the incident command ×50): worst
-  case 1.5 ms, well under the 500 ms budget — `main()` calls `is_doc_build`
-  outside the fail-open envelope, so a hang would freeze the turn. Full suite
-  green: 285 passed, 2 skipped.
+  re-arm, `--outdir "$OUTDIR"` is resolved rather than taken literally, and
+  neither form of the vault-incident class can arm (slugless, and slugged via a
+  foreign `outputs/<run>/`); while delivery conversion into `outputs/<slug>/`
+  (bare, trailing-slash, `--outdir=`, absolute, Windows, and quoted-with-space
+  forms), a convert with no `--outdir`, a check-render compounded with the real
+  conversion, an inline `-c` engine build beside a scratch render, `mkdocs
+  build` with an unrelated scratch outdir, a doc-named script, and cwd-derived
+  slugs all still arm. Measured A/B on the 2026-07-24 command through the hook
+  process, throttle cleared: v0.6.3 arms `.omd/.verify-pending` and fires the
+  reminder, this build arms nothing and stays silent. ReDoS latency over the new
+  regexes (400-char `--outdir` separator runs, `--outdir` + 20 000 `=`, a
+  300-deep variable chain, a 10 000-link `OUT=` chain, the incident command
+  ×50): worst case 1.7 ms against a 500 ms budget — `main()` calls
+  `is_doc_build` outside the fail-open envelope, so a hang would freeze the
+  turn. `ruff check hooks/ tests/` clean. Full suite green: 292 passed,
+  2 skipped.
+- Author≠reviewer: an independent adversarial pass (2026-07-27) reproduced six
+  real builds that the first cut of this fix silenced — a bare `--outdir
+  outputs`, a Windows outdir, a quoted outdir holding a space, a
+  scratch-then-delivery compound, `mkdocs build` beside a scratch outdir, and an
+  inline `-c` engine build beside a scratch render — plus the fabricated-
+  workspace hole above. All are fixed and pinned. One reported case is
+  intentional, not a defect: `--outdir "$HOME/my outputs/mydeck/"` is a
+  directory named `my outputs`, which is not the pipeline's `outputs/`
+  component, so it reads as scratch.
 
 ## [0.6.3] - 2026-07-24
 

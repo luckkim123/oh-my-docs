@@ -140,8 +140,9 @@ def test_dead_doc_exts_removed():
 # ── G1: verify-pending 센티널 arm/clear ───────────────────────────────
 
 def test_arm_writes_slug_sentinel(tmp_path):
-    """a) build 명령 + command에 outputs/mydeck/ 경로 포함 → .omd/mydeck/.verify-pending 생성."""
-    (tmp_path / ".omd").mkdir()  # v0.5.1: arm requires an existing .omd/ project
+    """a) build 명령 + command에 outputs/mydeck/ 경로 포함 → .omd/mydeck/.verify-pending 생성.
+    v0.6.4: 워크스페이스(.omd/mydeck/)가 실재해야 무장한다 (handle_md_edit 와 동일)."""
+    _with_slug(tmp_path, "mydeck")  # v0.5.1: arm requires an existing .omd/ project
     run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
     sentinel = tmp_path / ".omd" / "mydeck" / ".verify-pending"
     assert sentinel.is_file()
@@ -163,7 +164,7 @@ def test_clear_removes_all_sentinels_and_stays_silent(tmp_path):
     """c) pdftoppm 명령 → 기존 센티널 전부 제거, 리마인더 미발화. 루트 센티널은
     v0.6.4 이후 무장되지 않으므로 구버전 잔재를 직접 심어 광역 clear 계약을
     그대로 검증한다."""
-    (tmp_path / ".omd").mkdir()
+    _with_slug(tmp_path, "mydeck")
     (tmp_path / ".omd" / ".verify-pending").write_text(
         json.dumps({"armed_at": time.time(), "command_head": "legacy"}))
     run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
@@ -177,7 +178,7 @@ def test_clear_removes_all_sentinels_and_stays_silent(tmp_path):
 
 
 def test_clear_via_unzip_test_signal(tmp_path):
-    (tmp_path / ".omd").mkdir()
+    _with_slug(tmp_path, "mydeck")
     run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
     sentinel = tmp_path / ".omd" / "mydeck" / ".verify-pending"
     assert sentinel.is_file()
@@ -188,7 +189,7 @@ def test_clear_via_unzip_test_signal(tmp_path):
 
 def test_sentinel_content_has_armed_at_and_command_head(tmp_path):
     """d) 센티널 내용은 json이고 armed_at(epoch float)·command_head(str) 키 보유."""
-    (tmp_path / ".omd").mkdir()
+    _with_slug(tmp_path, "mydeck")
     run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
     sentinel = tmp_path / ".omd" / "mydeck" / ".verify-pending"
     data = json.loads(sentinel.read_text())
@@ -220,14 +221,16 @@ def test_arm_write_failure_still_fires_reminder_no_half_sentinel(tmp_path):
     (main()'s except around arm_sentinel, lines 294-295) AND no half-written
     sentinel is left behind for the Stop guard to trip over."""
     omd = tmp_path / ".omd"
-    omd.mkdir()
-    os.chmod(omd, 0o555)  # read+exec only: mkstemp() cannot create a tmp file here
+    (omd / "mydeck").mkdir(parents=True)  # workspace must exist for arm to try
+    os.chmod(omd / "mydeck", 0o555)  # read+exec: mkstemp() cannot create here
+    os.chmod(omd, 0o555)
     try:
         # slug 있는 명령이어야 arm 이 실제로 시도된다 (v0.6.4: slug 없으면 애초에
         # 쓰지 않으므로 쓰기 실패 경로를 못 탄다 — 테스트가 공허해짐).
         out = run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
     finally:
         os.chmod(omd, 0o755)
+        os.chmod(omd / "mydeck", 0o755)
     assert "document-integrity" in out
     assert not (omd / "mydeck" / ".verify-pending").exists()
 
@@ -237,7 +240,7 @@ def test_arm_write_failure_still_fires_reminder_no_half_sentinel(tmp_path):
 def test_cooldown_suppresses_repeat_reminder_but_keeps_sentinel_arm(tmp_path):
     """f) 같은 build 명령 2회 연속 → 1회차 리마인더 발화 + throttle 파일 생성,
     2회차 출력 없음(단 센티널은 2회차에도 갱신 arm — 쿨다운은 메시지만 침묵)."""
-    (tmp_path / ".omd").mkdir()
+    _with_slug(tmp_path, "mydeck")
     out1 = run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
     assert out1.strip() != ""
     throttle = tmp_path / ".omd" / ".hook-throttle.json"
@@ -624,7 +627,7 @@ def test_real_build_piping_to_tail_still_arms(tmp_path):
     """c3) the narrowing keys on the LEADING command, so a real build that pipes
     its log through tail/grep is untouched (leading token is python3, not a
     read-only viewer)."""
-    (tmp_path / ".omd").mkdir()
+    _with_slug(tmp_path, "mydeck")
     out = run_hook("python3 outputs/mydeck/build_deck.py 2>&1 | tail -5",
                    cwd=str(tmp_path))
     assert (tmp_path / ".omd" / "mydeck" / ".verify-pending").is_file()
@@ -793,6 +796,86 @@ def test_sentinel_records_matching_signal(tmp_path):
              cwd=str(tmp_path / ".omd" / slug))
     data = json.loads((tmp_path / ".omd" / slug / ".verify-pending").read_text())
     assert data["signal"] == "signal:from pptx"
+
+
+# ── v0.6.4 adversarial review findings (2026-07-27, independent pass) ───────
+# Nullifying the WHOLE signal route on a scratch render, and matching the outdir
+# with a bare `"outputs/" in value` substring test, silenced six real builds.
+
+def test_inline_engine_build_beside_a_scratch_render_still_arms(tmp_path):
+    """R1 (the serious one): an inline `-c` build that also renders a throwaway
+    copy in the same command is still a build — only signals that can appear
+    without the engine running are discounted."""
+    slug = _with_slug(tmp_path, "mydeck")
+    cmd = ("python3 -c 'from pptx import Presentation; "
+           "p=Presentation(); p.save(\"outputs/mydeck/current.pptx\")' && "
+           "soffice --convert-to pdf --outdir /tmp/chk outputs/mydeck/current.pptx")
+    assert is_doc_build(cmd)
+    run_hook(cmd, cwd=str(tmp_path))
+    assert (tmp_path / ".omd" / slug / ".verify-pending").is_file()
+
+
+def test_mkdocs_build_with_scratch_outdir_still_arms():
+    """R2: `mkdocs build` is not a convert — a scratch --outdir elsewhere in the
+    command must not discount it."""
+    assert is_doc_build("mkdocs build -d /tmp/site --outdir /tmp/x")
+
+
+def test_scratch_then_delivery_compound_still_arms():
+    """R3: ANY --outdir under outputs/ makes the command a delivery, so a
+    check-render followed by the real conversion still arms."""
+    assert is_doc_build(
+        "soffice --convert-to pdf --outdir /tmp/chk a.pptx && "
+        "soffice --convert-to pdf --outdir outputs/mydeck/ a.pptx")
+
+
+def test_delivery_outdir_variants_still_arm():
+    """R4: outdir matching is path-COMPONENT based after backslash
+    normalisation — a bare `outputs`, a Windows path, and a quoted path holding
+    a space were all misread as scratch by the substring test."""
+    for cmd in (
+        "soffice --headless --convert-to pdf --outdir outputs deck.pptx",
+        r"soffice --headless --convert-to pdf --outdir C:\proj\outputs\mydeck deck.pptx",
+        'soffice --convert-to pdf --outdir "my proj/outputs/mydeck/" deck.pptx',
+        "soffice --convert-to pdf --outdir=outputs/mydeck/ deck.pptx",
+        "soffice --convert-to pdf --outdir /Users/k/p/outputs/mydeck/ deck.pptx",
+    ):
+        assert is_doc_build(cmd), cmd
+
+
+def test_foreign_outputs_dir_does_not_fabricate_a_workspace(tmp_path):
+    """R6 (the one that falsified my own claim): `outputs/<name>/` is a prefix
+    other tools own — Hydra/PyTorch write runs there. In an ML repo that also
+    holds a `.omd/`, a one-liner naming `Document(` used to mine a slug out of
+    the run directory, MKDIR a `.omd/<run>/` workspace, and plant a slugged
+    sentinel that NO cleanup path removes (G7 only ever covered the slugless
+    form, and HK-4 forbids expiring slugged ones). That is the 2026-07-15 vault
+    incident wearing a slug. Requires the workspace to exist, like the Edit
+    path does."""
+    _with_slug(tmp_path, "real-deck")
+    (tmp_path / "outputs" / "2026-07-27_run3").mkdir(parents=True)
+    cmd = ("python3 -c \"from langchain.schema import Document; "
+           "print(Document(page_content=open('outputs/2026-07-27_run3/log.txt').read()))\"")
+    run_hook(cmd, cwd=str(tmp_path))
+    assert not (tmp_path / ".omd" / "2026-07-27_run3").exists(), "fabricated workspace"
+    assert list((tmp_path / ".omd").glob("**/.verify-pending")) == []
+
+
+def test_delivery_convert_needs_an_omd_workspace_too(tmp_path):
+    """R6b) same hole via the delivery-convert shape — a one-off page check
+    into `outputs/tmp-pagecheck/` must not create `.omd/tmp-pagecheck/`."""
+    _with_slug(tmp_path, "real-deck")
+    run_hook("soffice --headless --convert-to pdf --outdir outputs/tmp-pagecheck/ draft.docx",
+             cwd=str(tmp_path))
+    assert not (tmp_path / ".omd" / "tmp-pagecheck").exists()
+
+
+def test_outputs_lookalike_directory_is_not_a_delivery():
+    """R5: the component test must not over-widen — `my-outputs/` is somebody
+    else's directory, not the pipeline's delivery tree, so a render into it
+    stays a verify render."""
+    assert not is_doc_build(
+        "soffice --convert-to pdf --outdir my-outputs/checks/ deck.pptx")
 
 
 def test_command_head_survives_a_long_absolute_path(tmp_path):
