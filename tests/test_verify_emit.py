@@ -803,3 +803,76 @@ def test_command_head_survives_a_long_absolute_path(tmp_path):
              cwd=str(tmp_path))
     data = json.loads((tmp_path / ".omd" / slug / ".verify-pending").read_text())
     assert len(data["command_head"]) > 80
+
+
+# ── C (v0.6.5): 명령 안의 `cd` 가 훅에 보이지 않는다 (2026-07-27 두 번째 사고) ──
+# PostToolUse 페이로드의 cwd 는 *세션* cwd 다. 명령이 `cd <other-repo> && …` 로
+# 다른 저장소에 들어가 거기서만 작업해도, 훅은 세션 cwd 기준으로 root 를 잡아
+# **이 워크스페이스**의 .omd/ 에 센티널을 떨어뜨린다. 실제 사고: omd 훅 자체를
+# 조사하려고 oh-my-docs/hooks 로 cd 해서 돌린 힙독이, 무관한 워크스페이스의
+# .omd/utracker-seminar/ 를 "미검증"으로 낙인찍었다 (v0.6.4 로도 재현됨 —
+# v0.6.4 의 "slug 없으면 arm 안 함"은 slug 가 *문자열로 언급*되면 통과한다).
+
+HOOK_PROBE_CMD_TMPL = (
+    "cd {target} && python3 - <<'PY'\n"
+    "import docs_verify_emit as m\n"
+    'print(m.is_doc_build("soffice --headless --convert-to pdf x.docx"))\n'
+    'print(m._slug_of(".omd/utracker-seminar/build/deck.py", ""))\n'
+    "PY"
+)
+
+
+def _workspace_with_slug(tmp_path, slug="utracker-seminar"):
+    d = tmp_path / "workspace" / ".omd" / slug
+    d.mkdir(parents=True)
+    return tmp_path / "workspace", d / ".verify-pending"
+
+
+def test_cd_into_other_repo_arms_nothing_in_this_workspace(tmp_path):
+    """C) `cd <다른 repo>` 로 시작하는 명령은 이 워크스페이스의 센티널을 건드리지
+    않는다 — 2026-07-27 사고 재현본. 그 repo 엔 .omd 가 없으니 아무데도 안 무장."""
+    workspace, sentinel = _workspace_with_slug(tmp_path)
+    other = tmp_path / "oh-my-docs" / "hooks"
+    other.mkdir(parents=True)
+    run_hook(HOOK_PROBE_CMD_TMPL.format(target=other), cwd=str(workspace))
+    assert not sentinel.exists(), "다른 repo 로 cd 한 명령이 이 워크스페이스를 오염시킴"
+
+
+def test_same_command_without_cd_still_arms(tmp_path):
+    """C-대조군) 같은 명령이라도 `cd` 없이 이 워크스페이스에서 돌면 그대로 무장한다
+    — 수정이 '전부 침묵'이 아니라 *어디서 돌았나*를 본다는 증거."""
+    workspace, sentinel = _workspace_with_slug(tmp_path)
+    body = HOOK_PROBE_CMD_TMPL.format(target="X").split("&&", 1)[1].lstrip()
+    run_hook(body, cwd=str(workspace))
+    assert sentinel.is_file()
+
+
+def test_cd_into_this_workspace_still_arms(tmp_path):
+    """C-회귀) 워크스페이스 안으로 cd 하는 정상 빌드는 계속 무장한다."""
+    workspace, _ = _workspace_with_slug(tmp_path, "mydeck")
+    sentinel = workspace / ".omd" / "mydeck" / ".verify-pending"
+    run_hook(f"cd {workspace} && python3 .omd/mydeck/build_deck.py", cwd=str(workspace))
+    assert sentinel.is_file()
+
+
+def test_relative_cd_resolves_against_session_cwd(tmp_path):
+    """C-상대경로) `cd sub && …` 는 세션 cwd 기준으로 해석한다."""
+    workspace, _ = _workspace_with_slug(tmp_path, "mydeck")
+    (workspace / "sub").mkdir()
+    run_hook("cd sub && python3 .omd/mydeck/build_deck.py", cwd=str(workspace))
+    assert not (workspace / "sub" / ".omd").exists(), "없는 root 를 날조하면 안 됨"
+    assert not (workspace / ".omd" / "mydeck" / ".verify-pending").exists()
+
+
+def test_cd_lead_re_is_not_redos():
+    """CD_LEAD_RE 도 같은 규율을 지킨다 — 앵커 1회 매치, 바깥 반복 없음, 세 분기의
+    구분자 집합이 disjoint. 최악 케이스는 닫히지 않은 따옴표(첫 분기가 끝까지 훑고
+    실패한 뒤 나머지 분기로 넘어감)."""
+    import time as _t
+    for cmd in ('cd "' + "a" * 4000,
+                "cd " + "a" * 4000,
+                "cd " + "a/" * 2000 + " && python3 build.py"):
+        start = _t.perf_counter()
+        mod._command_cwd(cmd, "/tmp")
+        elapsed = _t.perf_counter() - start
+        assert elapsed < 0.5, f"_command_cwd took {elapsed:.3f}s — backtracking regression"

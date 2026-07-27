@@ -210,8 +210,38 @@ def _cwd_context(cwd):
     return None, None
 
 
-def _omd_root(payload):
-    cwd = payload.get("cwd") or os.getcwd()
+# v0.6.5: the PostToolUse payload's `cwd` is the SESSION cwd, so a command that
+# opens with `cd <other-repo> &&` and works only there was still judged against
+# THIS workspace — and dropped its sentinel here. 2026-07-27 incident: a heredoc
+# run after `cd oh-my-docs/hooks` to inspect this very hook armed
+# .omd/utracker-seminar/ in an unrelated workspace, branding a real project
+# unverified. (v0.6.4's "no slug -> no arm" does not catch it: the slug came
+# from a path quoted inside the script, so a slug WAS found.)
+# Anchored, single match, no outer repetition — the three alternatives have
+# disjoint delimiter sets, so no quantifier overlaps its neighbour (the v0.6.3
+# ReDoS lesson: main() calls this outside try/except, and a hang is a frozen
+# turn that fail-open cannot catch).
+# ponytail accepted ceilings: only the FIRST cd is read (`cd a && cd b` keeps a),
+# and `cd $VAR` / `cd -` fall back to the session cwd — both stay on the old
+# behaviour, which is the loud side.
+CD_LEAD_RE = re.compile(r"^\s*cd\s+(?:\"([^\"]*)\"|'([^']*)'|([^\s;&|]+))")
+
+
+def _command_cwd(command, cwd):
+    """Where the command actually runs: a leading `cd DIR` wins over the session
+    cwd. Relative targets resolve against the session cwd."""
+    m = CD_LEAD_RE.match(command or "")
+    if not m:
+        return cwd
+    target = next((g for g in m.groups() if g is not None), "")
+    if not target or target.startswith(("$", "-")):
+        return cwd  # unresolvable variable, or `cd -` — keep the old behaviour
+    target = os.path.expanduser(target)
+    return target if os.path.isabs(target) else os.path.join(cwd or "", target)
+
+
+def _omd_root(payload, command=""):
+    cwd = _command_cwd(command, payload.get("cwd") or os.getcwd())
     root, _ = _cwd_context(cwd)
     return root or os.path.join(cwd, ".omd")
 
@@ -422,11 +452,17 @@ def main() -> int:
     if tool != "Bash":
         return 0
     command = (payload.get("tool_input", {}) or {}).get("command", "")
+    # v0.6.5: a leading `cd DIR` decides which project this command belongs to —
+    # arm AND clear both follow it (via _command_cwd / _omd_root), so neither
+    # touches a workspace the command never entered. Resolution stays INSIDE each
+    # try block, as before: a failure there must skip only that step, never the
+    # reminder.
 
     # verify 실행이 최우선 — strict 빌드가 BUILD_SIGNALS 에 걸려 재-arm 되는 것 방지 (결정 2).
     try:
         if command and is_verify_run(command):
-            clear_sentinels(_omd_root(payload), command, payload.get("cwd") or "")
+            clear_sentinels(_omd_root(payload, command), command,
+                            _command_cwd(command, payload.get("cwd") or ""))
             return 0
     except Exception:
         pass  # fail-open
@@ -437,13 +473,14 @@ def main() -> int:
         return 0
 
     try:
-        arm_sentinel(_omd_root(payload), command, payload.get("cwd") or "", reason)
+        arm_sentinel(_omd_root(payload, command), command,
+                     _command_cwd(command, payload.get("cwd") or ""), reason)
     except Exception:
         pass  # fail-open: sentinel is best-effort, reminder still fires
 
     reminder = site_build_reminder() if "mkdocs" in command else build_reminder()
     try:
-        if reminder_throttled(_omd_root(payload), reminder):
+        if reminder_throttled(_omd_root(payload, command), reminder):
             return 0
     except Exception:
         pass  # fail-open: on any doubt, fire the reminder

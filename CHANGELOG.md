@@ -15,6 +15,53 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 
 ## [Unreleased]
 
+> Version bump deferred on purpose: v0.6.4 is not tagged yet (its PR is still
+> open, and this branch stacks on it). Bumping to 0.6.5 here would put
+> `plugin.json` two steps ahead of the latest tag and break the 1-deep
+> tag/version window that `test_version_sync.py` locks. Release this together
+> with — or right after — v0.6.4's tag.
+
+### Fixed
+
+- **A command that `cd`s into another repository armed a sentinel in THIS
+  workspace.** The PostToolUse payload's `cwd` is the *session* cwd, not where
+  the command ran, and nothing read the command's own leading `cd`. So a command
+  that opened with `cd <other-repo> &&` and worked exclusively there was still
+  judged against the session's workspace and planted its marker here. Live
+  2026-07-27 case, observed **on v0.6.4**: a `python3 - <<'PY'` heredoc run after
+  `cd oh-my-docs/hooks` — an attempt to inspect this very hook — armed
+  `.omd/utracker-seminar/.verify-pending` in an unrelated workspace, branding a
+  real, finished project unverified and handing its next session a warning it
+  had no way to explain. v0.6.4's "no slug → no arm" does not cover this: a slug
+  WAS found, because `SLUG_RE` matched a path quoted *inside the script body*
+  (`".omd/utracker-seminar/build/deck.py"`, passed as a test fixture). With the
+  slugless root sentinel gone, this quoted-path route is what remains of the
+  arm-side false-positive surface — and it is the more damaging one, since it
+  names a real workspace instead of `(slug unknown)`. `_command_cwd` now reads a
+  leading `cd DIR` (quoted or bare, `~` expanded, relative resolved against the
+  session cwd) and both `arm_sentinel` and `clear_sentinels` follow it, so
+  neither touches a project the command never entered. In the incident that
+  resolves the root to `<other-repo>/.omd`, which does not exist, so
+  `arm_sentinel`'s never-fabricate guard returns.
+  A narrower alternative — treating inline `python3 -c` / stdin scripts as
+  inspection — was **rejected**: `test_fires_on_inline_engine_signal` pins
+  `python3 -c 'from pptx import Presentation'` as a build, and the repo's own
+  `references/formats/README.md` uses that same shape for a read-only version
+  probe, so no rule over the *script body* separates the two. Location, not
+  syntax, is what actually distinguishes them.
+
+  Accepted ceilings, documented at `CD_LEAD_RE`: only the **first** `cd` is read
+  (`cd a && cd b` keeps `a`), and `cd $VAR` / `cd -` fall through to the session
+  cwd — both retain the pre-fix behaviour, which is the loud (arming) side. The
+  quoted-path `SLUG_RE` route still arms when the same command runs *without* a
+  `cd`; separating a path that is an operand from one that is a string literal
+  needs shell parsing this hook deliberately does not do, and every observed
+  incident carried a `cd`. `CD_LEAD_RE` follows the v0.6.3 ReDoS discipline
+  (anchored, single match, no outer repetition, disjoint delimiter sets per
+  alternative), pinned by `test_cd_lead_re_is_not_redos`; `main()` still resolves
+  root/cwd *inside* each `try` block, so a failure there skips only that step,
+  never the reminder.
+
 ## [0.6.4] - 2026-07-27
 
 ### Fixed
