@@ -494,6 +494,47 @@ def test_carve_out_does_not_swallow_real_builders():
         assert is_doc_build(f"python3 {name}"), name
 
 
+# ── v0.6.5: 인라인 실행 안의 스크립트명은 데이터 (2026-08-06, v0.6.4 진단 중 자가 발견) ──
+#
+# `python3 -c` / `python3 - <<EOF` 는 스크립트 *파일*을 실행하지 않는다. 인자·heredoc
+# 본문에 등장하는 build_deck.py 는 논의 대상 문자열이지 실행되는 프로그램이 아니다.
+# v0.6.4 를 진단하던 one-liner 두 개가 정확히 이렇게 sentinel 을 armed 했다.
+
+def test_inline_c_flag_with_script_name_in_argument_stays_silent(tmp_path):
+    """python3 -c "…'build_deck.py'…" — 실행이 아니라 데이터. 재현 형태 그대로."""
+    (tmp_path / ".omd").mkdir()
+    out = run_hook("""python3 -c "print('python3 build_deck.py')" """, cwd=str(tmp_path))
+    assert out.strip() == ""
+    assert not (tmp_path / ".omd" / ".verify-pending").exists()
+
+
+def test_inline_execution_variants_stay_silent():
+    """-c, 플래그가 앞에 붙은 -c, stdin(bare -) 모두 파일 실행이 아니다."""
+    for cmd in ('python3 -c "x = \'build_deck.py\'"',
+                'python3 -u -c "x = \'build_deck.py\'"',
+                'python -c "x = \'make_presentation.py\'"',
+                "python3 - <<'EOF'\nx = 'build_deck.py'\nEOF"):
+        assert not is_doc_build(cmd), cmd
+
+
+def test_inline_carve_out_keeps_the_piped_build_protected():
+    """v0.6.3 이 지키기로 한 `build_deck.py | tail` 은 그대로 arm — 파이프에는 -c 가 없다."""
+    assert is_doc_build("python3 build_deck.py | tail -5")
+    assert is_doc_build("python3 outputs/mydeck/build_deck.py")
+
+
+def test_inline_carve_out_does_not_touch_the_signal_route():
+    """엔진을 인라인으로 진짜 돌려 덱을 만드는 -c 는 signal route 로 여전히 잡힌다."""
+    assert is_doc_build(
+        'python3 -c "from pptx import Presentation; Presentation().save(\'a.pptx\')"')
+
+
+def test_dash_lookahead_does_not_swallow_m_or_u_flags():
+    """bare-dash 분기는 `-` 뒤 공백/EOL 을 요구 — -m/-u 를 stdin 모드로 오인하지 않는다."""
+    assert is_doc_build("python3 -u build_deck.py")
+    assert not is_doc_build("python3 -m pytest tests/test_deck.py")
+
+
 # Recovered verbatim from vault session 4f56a5f0 (2026-07-15): a robotics
 # deploy+test pipeline whose `python3 -m pytest ... test_obs_builder.py` segment
 # matched RUN_SCRIPT_RE via the "build" substring of "obs_builder" and planted a

@@ -15,6 +15,27 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-08-06
+
+### Fixed
+
+- **A build-script name inside an inline-execution argument was read as a build.**
+  `python3 -c` and `python3 - <<EOF` run inline code, never a script *file*, so
+  `build_deck.py` appearing in the argument (or heredoc body) is a string being
+  discussed rather than a program being run. Found by dogfooding v0.6.4: the very
+  one-liners that passed `'python3 build_deck.py'` to `is_doc_build()` **as test
+  data** armed two sentinels while diagnosing the previous bug (2026-08-06,
+  14:37:49 and 14:42:03). This is the same class as v0.6.3's engine-string-as-data
+  fix, which nullifies `BUILD_SIGNALS` through `is_readonly_inspection` but
+  deliberately left the script route alone to protect `build_deck.py | tail`. New
+  `INLINE_CODE_RE` keys on the inline-execution flag instead, so that protection is
+  untouched — a piped real build has neither `-c` nor a bare `-`. The bare-dash
+  branch requires `-` followed by space/EOL so `-m` and `-u` are not mistaken for
+  stdin mode. The **signal route is deliberately not touched**: `python3 -c "from
+  pptx import Presentation; …"` can genuinely author a deck inline, and
+  `is_readonly_inspection` already judges that case. 5 regression tests, including
+  the piped-build and signal-route guards that pin what must keep firing.
+
 ## [0.6.4] - 2026-08-06
 
 ### Fixed

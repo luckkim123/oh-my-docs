@@ -76,6 +76,21 @@ VERIFY_SCRIPT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# v0.6.5: `python3 -c "…"` and `python3 - <<'PY'` run inline code, never a script
+# FILE — so a build-script name inside the argument (or the heredoc body) is a
+# string being discussed, not a program being run. Diagnosing the v0.6.4 bug armed
+# two sentinels exactly this way: a one-liner that merely passed
+# 'python3 build_deck.py' to is_doc_build() as test data was itself judged a build
+# (2026-08-06). Same class as v0.6.3's engine-string-as-data fix, which nullifies
+# BUILD_SIGNALS via is_readonly_inspection but deliberately leaves the script route
+# alone to protect `build_deck.py | tail`. Keying on the inline-execution flag keeps
+# that protection intact — a piped real build has neither -c nor a bare -. The
+# signal route stays untouched on purpose: `python3 -c "from pptx import …"` can
+# genuinely author a deck inline, and is_readonly_inspection already judges it.
+# The bare-dash branch needs the lookahead (`-` followed by space/EOL) so that -m,
+# -u and friends are not mistaken for stdin mode.
+INLINE_CODE_RE = re.compile(r"\bpython3?\b\s+(?:-[A-Za-z]+\s+)*(?:-c\b|-(?=\s|$))")
+
 # v0.6.3: read-only / inspection commands merely NAME an engine string; they do
 # not run it to generate a document. A slugless .verify-pending was armed in a
 # workspace that built nothing by exactly this (2026-07-24): a grep whose search
@@ -257,7 +272,11 @@ def is_doc_build(command: str) -> bool:
     name = m.group(1).lower() if m else ""
     # v0.6.4: widened from test_/_test.py to every verification prefix/suffix —
     # `assert_deck.py` checks a deck, it does not build one (see VERIFY_SCRIPT_RE).
-    runs_doc_script = bool(m) and not VERIFY_SCRIPT_RE.search(name)
+    # v0.6.5: and `python3 -c` runs no script file at all, so a script name inside
+    # its argument is data (see INLINE_CODE_RE). Signal route stays untouched.
+    runs_doc_script = (bool(m)
+                       and not VERIFY_SCRIPT_RE.search(name)
+                       and not INLINE_CODE_RE.search(command))
     return has_signal or runs_doc_script
 
 
