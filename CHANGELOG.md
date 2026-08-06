@@ -15,6 +15,31 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-08-06
+
+### Fixed
+
+- **`docs_verify_emit` armed a `verify-pending` sentinel on a script that VERIFIES a
+  deck** — the third arm-side false positive, and the one that inverted the hook's own
+  meaning. `assert_deck.py` matched `RUN_SCRIPT_RE` purely on its `deck` token, so
+  running the deck's assertion script armed "this deck still needs verification".
+  Observed 2026-08-05 on the workspace `koopman-seminar` deck: `deck_draft.pptx` was
+  built at 20:20:41 and versioned at 20:23:14, then `assert_deck.py` ran at 20:25:29
+  and armed the sentinel — four minutes *after* the artifact was finished and checked.
+  The warning then survived into the next day's session, re-firing on every turn of an
+  unrelated conversation, because nothing in that session ever ran a clearing command.
+  Naming a checker after the artifact it checks (`assert_deck.py`, `check_slides.py`)
+  is the ordinary convention, so the document token cannot carry the build decision by
+  itself. The captured script name already had exactly this carve-out for
+  `test_`/`_test.py` (v0.5.1); it is now widened to the remaining verification
+  prefixes and suffixes — `assert`, `check`, `verify`, `validate`, `inspect`, `audit`,
+  `lint` — via a new `VERIFY_SCRIPT_RE`. Genuine builders are untouched: the carve-out
+  keys on the prefix/suffix position, so `build_deck.py`, `deck_builder.py`,
+  `make_presentation.py`, and `rebuild_docx.py` all still arm. Sibling axis to v0.6.3
+  (engine string named as data) and v0.6.2 (clear-side leak); this one is the script
+  route, which neither touched. 4 regression tests added (`test_verify_emit.py`),
+  including the reproduction command verbatim and an over-reach guard.
+
 ## [0.6.3] - 2026-07-24
 
 ### Fixed

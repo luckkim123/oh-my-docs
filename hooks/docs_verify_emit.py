@@ -61,6 +61,21 @@ RUN_SCRIPT_RE = re.compile(
 # finding, 2026-07-16) and silence a genuine build.
 TEST_RUN_RE = re.compile(r"(?:^|[\s;|&])(?:pytest|unittest)(?:[\s;|&]|$)")
 
+# v0.6.4: a script that CHECKS a deck builds nothing. `assert_deck.py` matched
+# RUN_SCRIPT_RE purely on its `deck` token and armed a sentinel at 20:25 — four
+# minutes AFTER the real build had produced deck_draft.pptx and been versioned
+# (workspace koopman-seminar, 2026-08-05). The warning therefore fired because
+# the deck had been verified, which is exactly backwards, and it survived into
+# the next day's session as a stale sentinel. This is the same carve-out the
+# captured name already had for test_/_test.py, widened to the other
+# verification prefixes/suffixes; naming a checker after the artifact it checks
+# is the normal convention, so the `deck` token cannot carry the decision alone.
+VERIFY_SCRIPT_RE = re.compile(
+    r"^(?:test|assert|check|verify|validate|inspect|audit|lint)_"
+    r"|_(?:test|assert|check|verify|validate|inspect|audit|lint)\.py$",
+    re.IGNORECASE,
+)
+
 # v0.6.3: read-only / inspection commands merely NAME an engine string; they do
 # not run it to generate a document. A slugless .verify-pending was armed in a
 # workspace that built nothing by exactly this (2026-07-24): a grep whose search
@@ -240,7 +255,9 @@ def is_doc_build(command: str) -> bool:
                   and not is_readonly_inspection(command))
     m = RUN_SCRIPT_RE.search(command)
     name = m.group(1).lower() if m else ""
-    runs_doc_script = bool(m) and not (name.startswith("test_") or name.endswith("_test.py"))
+    # v0.6.4: widened from test_/_test.py to every verification prefix/suffix —
+    # `assert_deck.py` checks a deck, it does not build one (see VERIFY_SCRIPT_RE).
+    runs_doc_script = bool(m) and not VERIFY_SCRIPT_RE.search(name)
     return has_signal or runs_doc_script
 
 

@@ -455,6 +455,45 @@ def test_hyphenated_pytest_like_build_script_still_arms(tmp_path):
     assert (tmp_path / ".omd" / ".verify-pending").is_file()
 
 
+# ── v0.6.4: 검증 스크립트를 빌드로 오인 (2026-08-05 koopman-seminar) ──
+#
+# `assert_deck.py` 는 덱을 *검사*하는데 RUN_SCRIPT_RE 의 `deck` 토큰만으로 빌드로
+# 잡혀, 진짜 빌드가 끝나고 versioning 까지 마친 4분 뒤에 sentinel 을 armed 했다.
+# 즉 "검증했더니 검증이 필요하다"는 경고가 켜졌고, 다음 날 세션까지 stale 로 남았다.
+# 검사기를 대상 산출물 이름으로 짓는 건 통상 관례이므로 `deck` 토큰 단독으로
+# 판정할 수 없다 — test_ 에만 있던 carve-out 을 나머지 검증 접두/접미로 넓힌다.
+
+def test_assert_script_named_after_the_deck_stays_silent(tmp_path):
+    """python3 assert_deck.py — 2026-08-05 오탐 재현 커맨드 그대로."""
+    (tmp_path / ".omd").mkdir()
+    out = run_hook("cd .omd/koopman-seminar/build && python3 assert_deck.py",
+                   cwd=str(tmp_path))
+    assert out.strip() == ""
+    assert not (tmp_path / ".omd" / ".verify-pending").exists()
+    assert not (tmp_path / ".omd" / "koopman-seminar" / ".verify-pending").exists()
+
+
+def test_every_verification_prefix_stays_silent():
+    """검사 성격의 접두는 문서 토큰을 달고 있어도 빌드가 아니다."""
+    for name in ("assert_deck.py", "check_slides.py", "verify_docx.py",
+                 "validate_pptx.py", "inspect_doc.py", "audit_deck.py",
+                 "lint_presentation.py"):
+        assert not is_doc_build(f"python3 {name}"), name
+
+
+def test_verification_suffix_stays_silent():
+    """접미형(`deck_audit.py`)도 대칭으로 제외 — `_test.py` 와 같은 모양."""
+    for name in ("deck_audit.py", "slides_check.py", "doc_verify.py"):
+        assert not is_doc_build(f"python3 {name}"), name
+
+
+def test_carve_out_does_not_swallow_real_builders():
+    """오버리치 방지: 검증 어휘가 *접두/접미가 아닌* 진짜 빌더는 계속 arm."""
+    for name in ("build_deck.py", "deck_builder.py", "build_slides.py",
+                 "make_presentation.py", "rebuild_docx.py"):
+        assert is_doc_build(f"python3 {name}"), name
+
+
 # Recovered verbatim from vault session 4f56a5f0 (2026-07-15): a robotics
 # deploy+test pipeline whose `python3 -m pytest ... test_obs_builder.py` segment
 # matched RUN_SCRIPT_RE via the "build" substring of "obs_builder" and planted a
