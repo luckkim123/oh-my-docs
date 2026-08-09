@@ -62,8 +62,8 @@ RUN_SCRIPT_RE = re.compile(
 TEST_RUN_RE = re.compile(r"(?:^|[\s;|&])(?:pytest|unittest)(?:[\s;|&]|$)")
 
 # v0.6.4: a script that CHECKS a deck builds nothing. `assert_deck.py` matched
-# RUN_SCRIPT_RE purely on its `deck` token and armed a sentinel at 20:25 — four
-# minutes AFTER the real build had produced deck_draft.pptx and been versioned
+# RUN_SCRIPT_RE purely on its `deck` token and armed a sentinel four minutes
+# AFTER the real build had produced deck_draft.pptx and been versioned
 # (workspace koopman-seminar, 2026-08-05). The warning therefore fired because
 # the deck had been verified, which is exactly backwards, and it survived into
 # the next day's session as a stale sentinel. This is the same carve-out the
@@ -90,6 +90,18 @@ VERIFY_SCRIPT_RE = re.compile(
 # The bare-dash branch needs the lookahead (`-` followed by space/EOL) so that -m,
 # -u and friends are not mistaken for stdin mode.
 INLINE_CODE_RE = re.compile(r"\bpython3?\b\s+(?:-[A-Za-z]+\s+)*(?:-c\b|-(?=\s|$))")
+
+# ponytail known ceiling (found 2026-08-09, unfixed — needs the same adversarial
+# review this file's other regexes got before landing a fix): a `python3 -
+# <<'PY'` heredoc that only reads/writes a TEXT file (e.g. editing an .omd/wiki/
+# article) can still arm via the BUILD_SIGNALS route below if the file's own
+# CONTENT contains an engine string as prose/example code (e.g. a wiki page
+# documenting "from pptx import Presentation" pitfalls). INLINE_CODE_RE guards
+# only the RUN_SCRIPT_RE route (a script name as data); it deliberately leaves
+# BUILD_SIGNALS untouched because a real `python3 -c "from pptx import …"` can
+# genuinely author a deck inline. Distinguishing "engine call" from "engine
+# string quoted inside a string literal being written to a .md file" needs a
+# real shape check, not a substring nullifier — out of scope for this pass.
 
 # v0.6.3: read-only / inspection commands merely NAME an engine string; they do
 # not run it to generate a document. A slugless .verify-pending was armed in a
@@ -122,21 +134,62 @@ READONLY_LEAD_RE = re.compile(
 # tolerates `wb.save (…)` spacing.
 XLSX_WRITE_RE = re.compile(r"\bWorkbook\b|\.save\s*\(|xlsxwriter|create_sheet")
 
+# v0.6.6: `--convert-to` carries TWO meanings and the cards draw the line by
+# OUTPUT PATH. A delivery conversion (docs-convert) "never mutates the source —
+# write to outputs/<slug>/" (references/conversions.md, Rules); the
+# "Render-to-PNG recipe (used by verify/inspect for proofreading)" converts into
+# a scratch <dir> (references/formats/pptx.md·docx.md·xlsx.md). So a convert
+# whose --outdir is not under outputs/ is a VERIFY render, and arming on it
+# inverts the hook — the command that PRODUCES the fresh-render evidence would
+# itself demand fresh-render evidence, exactly what main()'s verify-first check
+# exists to prevent. 2026-07-27 incident: a docx integrity render into
+# $CLAUDE_JOB_DIR/tmp armed a sentinel that outlived two releases.
+# No --outdir at all → soffice writes beside the source; still a build
+# (unchanged, pinned by test_fires_on_convert).
+OUTDIR_RE = re.compile(r"--outdir[=\s]+(\S+)")
+VAR_REF_RE = re.compile(r"^\$\{?(\w+)\}?")
+
+
+def _resolve_shell_var(value: str, command: str) -> str:
+    """One level of `NAME=value` lookup inside the SAME command, so
+    `--outdir "$OUTDIR"` is judged on the path it holds rather than on the
+    variable name (the incident command assigns OUTDIR five lines above the
+    convert). Unresolvable → the literal text, which names no `outputs/` and so
+    reads as scratch: the silent side, the same missed-build ceiling
+    is_readonly_inspection already accepts."""
+    v = value.strip("\"'")
+    m = VAR_REF_RE.match(v)
+    if not m:
+        return v
+    assign = re.search(r"(?:^|[\s;&])" + re.escape(m.group(1)) + r"=(\S+)",
+                       command, re.M)
+    return assign.group(1).strip("\"'") + v[m.end():] if assign else v
+
+
+def is_scratch_render(command: str) -> bool:
+    """A convert whose --outdir resolves outside `outputs/` renders a throwaway
+    copy for inspection, not a deliverable."""
+    m = OUTDIR_RE.search(command)
+    return bool(m) and "outputs/" not in _resolve_shell_var(m.group(1), command)
+
 
 def is_readonly_inspection(command: str) -> bool:
-    """True when the command only READS/searches, so an engine string in it is
-    data (grep pattern, file arg) rather than a build. Two shapes seen in the
-    wild (2026-07-24 false positive): a leading text viewer (grep/cat/rg/…), and
-    an openpyxl load_workbook dump with no write indicator.
+    """True when the command INSPECTS rather than produces a deliverable, so an
+    engine string in it is data (grep pattern, file arg) or the engine only
+    renders a throwaway copy. Three shapes seen in the wild: a leading text
+    viewer (grep/cat/rg/…) and an openpyxl load_workbook dump with no write
+    indicator (2026-07-24), plus a convert into a scratch --outdir (2026-07-27).
     ponytail known ceilings (accepted — the missed-build direction is advisory,
     the codebase's stated safe side): a leading viewer guarding an inline `-c`
     engine build (`grep q f && python3 -c '…Presentation().save()'`) is silenced
-    (a doc-NAMED script after the viewer still arms, via runs_doc_script); and a
+    (a doc-NAMED script after the viewer still arms, via the script route); and a
     non-load_workbook read (`import openpyxl; print(openpyxl.__version__)`) still
     arms. Both are low-likelihood; widen only if they surface."""
     if READONLY_LEAD_RE.match(command):
         return True
     if "load_workbook" in command and not XLSX_WRITE_RE.search(command):
+        return True
+    if is_scratch_render(command):
         return True
     return False
 
@@ -200,8 +253,45 @@ def _cwd_context(cwd):
     return None, None
 
 
-def _omd_root(payload):
-    cwd = payload.get("cwd") or os.getcwd()
+# v0.6.6: the PostToolUse payload's `cwd` is the SESSION cwd, so a command that
+# opens with `cd <other-repo> &&` and works only there was still judged against
+# THIS workspace — and dropped its sentinel here. 2026-07-27 incident: a heredoc
+# run after `cd oh-my-docs/hooks` to inspect this very hook armed
+# .omd/utracker-seminar/ in an unrelated workspace, branding a real project
+# unverified. (The slug-context-required arm alone does not catch it: the slug
+# came from a path quoted inside the script, so a slug WAS found.) A second,
+# simpler shape of the same bug (found 2026-08-06, koopman-seminar): a plain
+# `cd .omd/<slug> && soffice --headless …` with no trailing slash after <slug>
+# does not match SLUG_RE either (it requires a `/` after the slug), and the
+# session cwd sat at the workspace root — so the command fell all the way to
+# the (now-removed) slugless root sentinel, misattributing a real build to no
+# workspace at all. Both shapes are the same root cause: nothing read the
+# command's own leading `cd`.
+# Anchored, single match, no outer repetition — the three alternatives have
+# disjoint delimiter sets, so no quantifier overlaps its neighbour (the v0.6.3
+# ReDoS lesson: main() calls this outside try/except, and a hang is a frozen
+# turn that fail-open cannot catch).
+# ponytail accepted ceilings: only the FIRST cd is read (`cd a && cd b` keeps a),
+# and `cd $VAR` / `cd -` fall back to the session cwd — both stay on the old
+# behaviour, which is the loud side.
+CD_LEAD_RE = re.compile(r"^\s*cd\s+(?:\"([^\"]*)\"|'([^']*)'|([^\s;&|]+))")
+
+
+def _command_cwd(command, cwd):
+    """Where the command actually runs: a leading `cd DIR` wins over the session
+    cwd. Relative targets resolve against the session cwd."""
+    m = CD_LEAD_RE.match(command or "")
+    if not m:
+        return cwd
+    target = next((g for g in m.groups() if g is not None), "")
+    if not target or target.startswith(("$", "-")):
+        return cwd  # unresolvable variable, or `cd -` — keep the old behaviour
+    target = os.path.expanduser(target)
+    return target if os.path.isabs(target) else os.path.join(cwd or "", target)
+
+
+def _omd_root(payload, command=""):
+    cwd = _command_cwd(command, payload.get("cwd") or os.getcwd())
     root, _ = _cwd_context(cwd)
     return root or os.path.join(cwd, ".omd")
 
@@ -212,23 +302,37 @@ def _slug_of(command, cwd):
     return m.group(1) if m else _cwd_context(cwd)[1]
 
 
-def _sentinel_path(root, command, cwd=""):
-    slug = _slug_of(command, cwd)
-    return os.path.join(root, slug, SENTINEL) if slug else os.path.join(root, SENTINEL)
+HEAD_CHARS = 200  # v0.6.6: 80 was consumed by one absolute path in the
+# 2026-07-27 marker, so the head said nothing about why it armed.
 
 
-def _write_sentinel(path, head):
-    """Atomic write (ST-1): half-written sentinels must never exist."""
-    atomic_write_json(path, {"armed_at": time.time(), "command_head": head[:80]})
+def _write_sentinel(path, head, signal=""):
+    """Atomic write (ST-1): half-written sentinels must never exist. `signal`
+    records WHICH rule armed it (v0.6.6), so a stale marker explains itself
+    instead of needing a session-transcript dig to diagnose."""
+    atomic_write_json(path, {"armed_at": time.time(),
+                             "command_head": head[:HEAD_CHARS],
+                             "signal": signal})
 
 
-def arm_sentinel(root, command, cwd=""):
+def arm_sentinel(root, command, cwd="", signal=""):
     # v0.5.1 noise control: only an existing .omd/ project can be armed — never
-    # fabricate .omd/ in a repo the pipeline has not touched. Mirrors
-    # handle_md_edit's "no slug context -> not an omd artifact" rule.
+    # fabricate .omd/ in a repo the pipeline has not touched.
     if not os.path.isdir(root):
         return
-    _write_sentinel(_sentinel_path(root, command, cwd), command)
+    # v0.6.6: and only WITH slug context — now actually mirroring
+    # handle_md_edit's "no slug context -> not an omd pipeline artifact" rule,
+    # which the comment here claimed while the code still wrote a slugless ROOT
+    # sentinel. A sentinel names the workspace to go verify; with no slug the
+    # Stop guard could only say "(slug unknown)", which no docs-verify run can
+    # act on and no clear_sentinels call in such a workspace would ever remove
+    # (the 2026-07-24 marker was still warning three days and two releases
+    # later). The build reminder still fires for slugless builds — only the
+    # Stop-level tracker needs an actionable target.
+    slug = _slug_of(command, cwd)
+    if not slug:
+        return
+    _write_sentinel(os.path.join(root, slug, SENTINEL), command, signal)
 
 
 def clear_sentinels(root, command, cwd=""):
@@ -251,33 +355,46 @@ def clear_sentinels(root, command, cwd=""):
             pass
 
 
-def is_doc_build(command: str) -> bool:
-    """True when the command signals a build/convert. Two routes:
-    (a) an explicit engine/convert signal (`from pptx`, `--convert-to`, …) — fires
-        on its own, since these name the engine/convert unambiguously; or
-    (b) running a doc-named python script (`python3 build_deck.py`) — the builder's
-        own recipe, which often names neither the engine nor a .pptx inline.
+def build_reason(command: str):
+    """Which rule classifies this command as a build, as a short tag recorded
+    into the sentinel (None = not a build). Two routes:
+    (a) running a doc-named python script (`python3 build_deck.py`) — the builder's
+        own recipe, which often names neither the engine nor a .pptx inline. Skipped
+        for a checker script (VERIFY_SCRIPT_RE) and for a filename that is merely DATA
+        inside inline-executed code (INLINE_CODE_RE) — neither builds anything; or
+    (b) an explicit engine/convert signal (`from pptx`, `--convert-to`, …), unless
+        the command only inspects (is_readonly_inspection) — an engine string
+        named as data, a scratch-outdir verify render, is not a build.
     Read-only renders/checks (pdftoppm, unzip -t) and unrelated scripts
     (`python3 analyze_runs.py`) match neither and stay silent (noise control)."""
     if not command:
-        return False
+        return None
     if TEST_RUN_RE.search(command):
-        return False  # test runs never build a deliverable (v0.5.1)
-    # v0.6.3: an engine string named as data (grep pattern, read-only openpyxl
-    # dump) is not a build — it nullifies the signal, but a doc-named script run
-    # (RUN_SCRIPT_RE, e.g. `build_deck.py | tail`) still counts.
-    has_signal = (any(sig in command for sig in BUILD_SIGNALS)
-                  and not is_readonly_inspection(command))
+        return None  # test runs never build a deliverable (v0.5.1)
+    # Checked first so a doc-named script inside an inspection-shaped command
+    # (`build_deck.py | tail`) still counts, as v0.6.3 established.
     m = RUN_SCRIPT_RE.search(command)
     name = m.group(1).lower() if m else ""
-    # v0.6.4: widened from test_/_test.py to every verification prefix/suffix —
-    # `assert_deck.py` checks a deck, it does not build one (see VERIFY_SCRIPT_RE).
-    # v0.6.5: and `python3 -c` runs no script file at all, so a script name inside
-    # its argument is data (see INLINE_CODE_RE). Signal route stays untouched.
-    runs_doc_script = (bool(m)
-                       and not VERIFY_SCRIPT_RE.search(name)
-                       and not INLINE_CODE_RE.search(command))
-    return has_signal or runs_doc_script
+    # v0.6.4: `assert_deck.py`/`check_slides.py` CHECK a deck, they do not build
+    # one — VERIFY_SCRIPT_RE widens the test_/_test.py carve-out to every
+    # verification prefix/suffix. v0.6.5: `python3 -c`/heredoc runs no script
+    # FILE at all, so a script name inside its argument/body is data, not a
+    # program being run (INLINE_CODE_RE) — the signal route below is untouched
+    # by this, since `python3 -c "from pptx import …"` can genuinely build.
+    if (m and not VERIFY_SCRIPT_RE.search(name)
+          and not INLINE_CODE_RE.search(command)):
+        return "script:" + m.group(1)
+    if is_readonly_inspection(command):
+        return None
+    for sig in BUILD_SIGNALS:
+        if sig in command:
+            return "signal:" + sig
+    return None
+
+
+def is_doc_build(command: str) -> bool:
+    """Boolean face of build_reason (the classifier the tests pin)."""
+    return build_reason(command) is not None
 
 
 def build_reminder() -> str:
@@ -330,7 +447,8 @@ def handle_md_edit(payload) -> int:
         root = _omd_root(payload)
         if not os.path.isdir(os.path.join(root, slug)):
             return 0  # no slug context → not an omd pipeline artifact (noise control)
-        _write_sentinel(os.path.join(root, slug, SENTINEL), "edit:" + file_path)
+        _write_sentinel(os.path.join(root, slug, SENTINEL), "edit:" + file_path,
+                        "md-edit")
         reminder = md_reminder(slug)
         if reminder_throttled(root, reminder):
             return 0
@@ -393,27 +511,35 @@ def main() -> int:
     if tool != "Bash":
         return 0
     command = (payload.get("tool_input", {}) or {}).get("command", "")
+    # v0.6.6: a leading `cd DIR` decides which project this command belongs to —
+    # arm AND clear both follow it (via _command_cwd / _omd_root), so neither
+    # touches a workspace the command never entered. Resolution stays INSIDE each
+    # try block, as before: a failure there must skip only that step, never the
+    # reminder.
 
     # verify 실행이 최우선 — strict 빌드가 BUILD_SIGNALS 에 걸려 재-arm 되는 것 방지 (결정 2).
     try:
         if command and is_verify_run(command):
-            clear_sentinels(_omd_root(payload), command, payload.get("cwd") or "")
+            clear_sentinels(_omd_root(payload, command), command,
+                            _command_cwd(command, payload.get("cwd") or ""))
             return 0
     except Exception:
         pass  # fail-open
 
     # 문서 산출/변환 명령일 때만 리마인더. 그 외 Bash 는 침묵.
-    if not is_doc_build(command):
+    reason = build_reason(command)
+    if not reason:
         return 0
 
     try:
-        arm_sentinel(_omd_root(payload), command, payload.get("cwd") or "")
+        arm_sentinel(_omd_root(payload, command), command,
+                     _command_cwd(command, payload.get("cwd") or ""), reason)
     except Exception:
         pass  # fail-open: sentinel is best-effort, reminder still fires
 
     reminder = site_build_reminder() if "mkdocs" in command else build_reminder()
     try:
-        if reminder_throttled(_omd_root(payload), reminder):
+        if reminder_throttled(_omd_root(payload, command), reminder):
             return 0
     except Exception:
         pass  # fail-open: on any doubt, fire the reminder
