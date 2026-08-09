@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from hooks.docs_stop_guard import expire_stale_slugless
+from hooks.docs_stop_guard import purge_slugless_sentinel
 
 HOOK = Path(__file__).parent.parent / "hooks" / "docs_stop_guard.py"
 
@@ -139,21 +139,23 @@ def test_stage_evidence_old_log_ignored(tmp_path):
     assert "stage-evidence" not in proc.stdout
 
 
-# ── G7: slugless sentinel self-expiry (2026-07-15 vault incident) ────────────
-# A slugless root sentinel names no .omd/<slug>/ workspace, so in a workspace
-# that never runs verify signals nothing ever clears it — without a TTL the
-# guard repeats "(slug unknown)" at every Stop forever. Slugged sentinels mark
-# real carried-over work (HK-4) and must never expire.
+# ── v0.6.6: slugless sentinels are legacy state, purged on sight ─────────────
+# G7 gave the slugless root sentinel a 7-day TTL because nothing else cleared
+# it. v0.6.6 removes its source instead (docs_verify_emit will not arm without
+# slug context), so any slugless sentinel found on disk was written by an older
+# version — and a TTL only meant an UPGRADED install kept re-warning for up to a
+# week (the 2026-07-24 marker still fired on 2026-07-27, after two releases).
+# Slugged sentinels mark real carried-over work (HK-4) and must never expire.
 
-def test_slugless_sentinel_expires_after_ttl(tmp_path):
-    """9) G7: a slugless root sentinel older than SLUGLESS_EXPIRE_AFTER is
-    removed with one final notice; the following Stop is silent."""
+def test_legacy_slugless_sentinel_purged_on_sight(tmp_path):
+    """9) 구버전이 심은 slugless 센티널은 나이와 무관하게 즉시 제거 + 1회 고지,
+    다음 Stop 은 침묵 (업그레이드 마이그레이션 — 부수결함 1)."""
     root = tmp_path / ".omd"
     write_sentinel(root, "", time.time() - 8 * 24 * 3600)
     proc = run_hook({"cwd": str(tmp_path)})
     assert proc.returncode == 0
     message = json.loads(proc.stdout)["systemMessage"]  # stdout is \u-escaped JSON
-    assert "만료" in message
+    assert "제거" in message
     assert "(slug unknown)" not in message
     assert not (root / ".verify-pending").exists()
     proc2 = run_hook({"cwd": str(tmp_path)})
@@ -161,31 +163,40 @@ def test_slugless_sentinel_expires_after_ttl(tmp_path):
     assert proc2.stdout.strip() == ""
 
 
-def test_slugless_sentinel_fresh_keeps_normal_advisory(tmp_path):
-    """10) a slugless sentinel younger than the TTL keeps the normal advisory
-    (stale-tagged after 6h, but not expired)."""
+def test_fresh_slugless_sentinel_also_purged_never_listed(tmp_path):
+    """10) 갓 만들어진 slugless 센티널도 동일 — 이제 그것을 무장시킬 수 있는
+    코드 경로가 없으므로 신선도와 무관하게 잔재다. "(slug unknown)" 행은
+    어떤 경우에도 다시 나오지 않는다."""
     root = tmp_path / ".omd"
-    write_sentinel(root, "", time.time() - 7 * 3600)
+    write_sentinel(root, "", time.time())
     proc = run_hook({"cwd": str(tmp_path)})
     assert proc.returncode == 0
-    assert "(slug unknown)" in proc.stdout
-    assert (root / ".verify-pending").is_file()
+    assert "(slug unknown)" not in proc.stdout
+    assert not (root / ".verify-pending").exists()
 
 
-def test_expire_stale_slugless_corrupt_json_treated_as_expired(tmp_path):
-    """12) a slugless sentinel with unparseable JSON falls back to
-    armed_at=0.0 (lines 38-39) -- always older than the TTL, so it is treated
-    as expired and removed with a one-time Korean notice instead of raising
-    or silently sticking around to nag forever (2026-07-15 vault incident
-    failure class: corrupt sentinel data)."""
+def test_purge_slugless_corrupt_json_still_removed(tmp_path):
+    """12) 파싱 불가 JSON 이어도 제거된다 (armed_at 을 더 이상 읽지 않으므로
+    구조적으로 안전 — 2026-07-15 vault incident 의 corrupt sentinel 계열)."""
     root = tmp_path / ".omd"
     root.mkdir()
     sentinel = root / ".verify-pending"
     sentinel.write_text("{not valid json")
-    notice = expire_stale_slugless(str(root))
+    notice = purge_slugless_sentinel(str(root))
     assert notice is not None
-    assert "만료" in notice
+    assert "제거" in notice
     assert not sentinel.exists()
+
+
+def test_message_does_not_claim_this_session(tmp_path):
+    """13) 부수결함 3: 3일 전 다른 세션 항목을 나열하면서 "이 세션에서 빌드된"
+    이라고 단정하던 문구 모순 해소."""
+    root = tmp_path / ".omd"
+    write_sentinel(root, "olddeck", time.time() - 72 * 3600)
+    proc = run_hook({"cwd": str(tmp_path)})
+    message = json.loads(proc.stdout)["systemMessage"]
+    assert "이 세션에서 빌드된" not in message
+    assert "carried over" in message
 
 
 def test_slugged_sentinel_never_self_expires(tmp_path):

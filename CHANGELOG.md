@@ -15,6 +15,60 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-08-09
+
+### Fixed
+
+- **`verify-pending`의 4차 라운드 — round2/round3(#23·#24, 2026-07-27 작성, draft로 방치)와
+  main에 별도로 착륙한 v0.6.4/v0.6.5(#853b1f2·#927d537)가 v0.6.3(`f08e0bc`) 지점에서
+  갈라진 채 서로 다른 결함 축을 독립적으로 고쳤다.** round2/round3는 검증 렌더 역전·
+  slug-context 누락·cd 미추적을 고쳤고, main은 체커 스크립트 오탐·인라인 코드
+  데이터-as-빌드 오탐을 고쳤다 — 어느 쪽도 서로의 축을 포함하지 않아 draft를 그대로
+  merge하면 상대가 고친 오탐이 되살아난다. 이번 라운드는 두 계열을 하나로 합친다
+  (양쪽 회귀 테스트 전부 유지 + 상호작용 테스트 2건 추가, `pytest -q`: 300 passed,
+  2 skipped — 실패 1건은 이 병합과 무관한 기존 태그 드리프트 문제로, 이 릴리스의
+  `v0.6.6` 태그가 부수적으로 해소한다).
+  - **검증 렌더가 검증을 요구하는 센티널을 arm** — `--convert-to`는 납품 변환(빌드)과
+    검증용 스크래치 렌더(빌드 아님) 두 의미를 겸하는데, 출력 위치(`outputs/<slug>/` vs
+    스크래치 `--outdir`)로 구분하지 않아 검증 자체가 재검증을 요구하는 순환이 발생했다
+    (2026-07-27, `$CLAUDE_JOB_DIR/tmp`로의 docx 무결성 렌더가 두 릴리스 동안 살아남은
+    센티널을 남김). `is_scratch_render`/`OUTDIR_RE`/`_resolve_shell_var`로 outdir이
+    `outputs/`(변수 1단계 해석 포함) 밖이면 검증으로 판정.
+  - **slug 컨텍스트 없이 arm되는 루트(slugless) 센티널** — `(slug unknown)`으로만
+    보고되어 어떤 `docs-verify`도 대상을 특정할 수 없고, 지워질 경로도 없어 사실상
+    영구 잔존했다(2026-07-24 마커가 2026-07-27까지 생존). `arm_sentinel`이 이제
+    slug 컨텍스트 없이는 arm하지 않는다 — G7의 7일 TTL은 더 이상 필요 없어 제거하고,
+    구버전이 남긴 slugless 센티널은 나이와 무관하게 발견 즉시 purge + 1회 고지로 대체.
+  - **명령의 leading `cd`를 추적하지 않아 엉뚱한 워크스페이스에 arm/clear** — 두 형태
+    모두 발생: (a) `cd <다른 repo> && …` 뒤 스크립트 안에 인용된 경로 문자열이 slug로
+    오인되어 무관한 워크스페이스를 오염(2026-07-27, `oh-my-docs/hooks`로 cd한 뒤 조사용
+    heredoc이 `.omd/utracker-seminar/`에 실제 완료된 프로젝트를 미검증으로 낙인), (b)
+    `cd .omd/<slug> && soffice --headless …`처럼 slug 뒤에 슬래시가 없어 `SLUG_RE`가
+    못 잡고 세션 cwd도 워크스페이스 루트라 slugless로 새는 경우(2026-08-06,
+    koopman-seminar). `CD_LEAD_RE`/`_command_cwd`가 명령 자체의 leading `cd`를 세션
+    cwd보다 우선해 arm·clear 양쪽에 적용.
+  - **`assert_deck.py`처럼 덱을 검사하는 스크립트가 빌드로 오인** — `RUN_SCRIPT_RE`의
+    `deck` 토큰만으로 판정해, 진짜 빌드가 끝나고 4분 뒤 검사 스크립트를 돌린 것이
+    "검증이 필요하다"는 경고를 켰다(2026-08-05, koopman-seminar). 검사기를 대상
+    산출물 이름으로 짓는 것이 통상 관례이므로 `deck` 토큰 단독으로 판정할 수 없다 —
+    `test_`/`_test.py`에만 있던 carve-out을 `assert`·`check`·`verify`·`validate`·
+    `inspect`·`audit`·`lint` 접두/접미로 확장(`VERIFY_SCRIPT_RE`, main #853b1f2에서
+    이식).
+  - **`python3 -c`/heredoc 인자 안의 스크립트 이름이 데이터인데 빌드로 오인** —
+    `python3 -c`나 `python3 - <<EOF`는 스크립트 *파일*을 실행하지 않으므로 인자/heredoc
+    본문에 `build_deck.py`가 등장해도 그건 실행되는 프로그램이 아니라 논의 대상
+    문자열이다. 직전 결함을 진단하던 중 정확히 이 형태로 sentinel이 armed됐다
+    (2026-08-06). `INLINE_CODE_RE`로 스크립트-경로만 무효화하고 signal 경로
+    (`python3 -c "from pptx import …; Presentation().save(…)"` 같은 진짜 인라인
+    빌드)는 그대로 둔다(main #927d537에서 이식).
+- **알려진 잔여 갭 (미수정, 코드 주석으로 명시)**: `python3 - <<'PY'` heredoc이 텍스트
+  파일(예: `.omd/wiki/*.md`)만 읽고/쓰는데, 그 파일의 *내용*이 예시 코드로
+  `from pptx import Presentation` 같은 문자열을 담고 있으면 `BUILD_SIGNALS`가 데이터를
+  코드로 오판해 여전히 arm될 수 있다(2026-08-09 발견, `.omd/wiki/technique/`
+  문서 편집 중 재현). `INLINE_CODE_RE`는 스크립트-이름-as-데이터만 막고 이 신호
+  경로는 의도적으로 건드리지 않는다 — 별도 라운드에서 같은 강도의 적대적 리뷰를
+  거쳐 고칠 것.
+
 ## [0.6.5] - 2026-08-06
 
 ### Fixed

@@ -22,12 +22,6 @@ from omd_atomic import atomic_write_json  # noqa: E402
 
 SENTINEL = ".verify-pending"
 STALE_AFTER = 6 * 3600  # older = carried over from an earlier session (HK-4)
-# G7: slugged sentinels have no TTL (HK-4 — real carried-over work stays visible),
-# but a SLUGLESS root sentinel names no .omd/<slug>/ workspace, so in a workspace
-# that never runs verify signals nothing ever clears it — it would re-warn
-# "(slug unknown)" at every Stop forever (2026-07-15 vault incident: a
-# misclassified robotics command armed one in a repo with no document history).
-SLUGLESS_EXPIRE_AFTER = 7 * 24 * 3600
 EVIDENCE_LOG = "stage-evidence.log"
 PILOT_STAGES = ("1", "2", "3", "4", "5", "6")  # intake..verify (docs-pilot Steps 1-6)
 # D2 (v0.6.2): shared with docs_verify_emit's HG-3 reminder cooldown — same file,
@@ -43,32 +37,34 @@ def _armed_at(path):
         return 0.0
 
 
-def expire_stale_slugless(root: str):
-    """G7: remove a slugless root sentinel past SLUGLESS_EXPIRE_AFTER and return
-    a one-time final notice (None otherwise). An unparseable armed_at counts as
-    expired — a corrupt slugless sentinel is pure noise. Fail-open: if removal
-    fails, stay silent and retry at the next Stop."""
+def purge_slugless_sentinel(root: str):
+    """v0.6.6 (replaces G7's 7-day TTL): docs_verify_emit no longer arms without
+    slug context, so any slugless root sentinel on disk was written by an older
+    version — remove it on sight and say so once (None when there is none).
+    It names no .omd/<slug>/ workspace, so its "(slug unknown)" warning was
+    unactionable: the one remedy the message offered (docs-verify) needs a slug,
+    and no clear_sentinels run in such a workspace would ever remove it. The TTL
+    was the wrong shape for that — it left an UPGRADED install re-warning for up
+    to a week (the 2026-07-24 marker was still firing on 2026-07-27, after two
+    releases). Fail-open: if removal fails, stay silent and retry next Stop."""
     path = os.path.join(root, SENTINEL)
     if not os.path.isfile(path):
-        return None
-    if time.time() - _armed_at(path) <= SLUGLESS_EXPIRE_AFTER:
         return None
     try:
         os.remove(path)
     except OSError:
         return None
-    days = int(SLUGLESS_EXPIRE_AFTER // 86400)
     return (
-        f"[OMD verify-pending] slug 없는 verify-pending 센티널이 {days}일 넘게 남아 있어 "
-        "자동 만료·제거했습니다 (마지막 고지 — 대응 문서 워크스페이스 없음)."
+        "[OMD verify-pending] slug 없는 구버전 verify-pending 센티널을 제거했습니다 "
+        "(v0.6.6부터 slug 컨텍스트 없이는 무장하지 않습니다 — 이 경고는 다시 뜨지 않습니다)."
     )
 
 
 def pending_sentinels(root: str):
+    # v0.6.6: no "(slug unknown)" row. A slugless sentinel is legacy state that
+    # purge_slugless_sentinel removes, and listing it only ever produced a
+    # warning nobody could act on. Only slugged workspaces are reported.
     found = []
-    top = os.path.join(root, SENTINEL)
-    if os.path.isfile(top):
-        found.append(("(slug unknown)", top))
     if os.path.isdir(root):
         for d in sorted(os.listdir(root)):
             p = os.path.join(root, d, SENTINEL)
@@ -85,7 +81,7 @@ def build_message(items):
                if now - _armed_at(path) > STALE_AFTER else "")
         lines.append(f"  - {slug}{tag}")
     return (
-        "[OMD verify-pending] 이 세션에서 빌드된 문서 중 fresh verify가 아직 확인되지 않은 항목:\n"
+        "[OMD verify-pending] fresh verify가 아직 확인되지 않은 문서 (이월분은 아래 표시):\n"
         + "\n".join(lines)
         + "\n검증하려면 docs-verify(무결성 게이트+전수 정독). "
         "advisory입니다 — verify를 나중에 해도 무방하며, 의도적 유예라면 무시하고 진행하세요."
@@ -183,7 +179,7 @@ def main() -> int:
         if payload.get("stop_hook_active"):
             return 0  # G1-chk: never re-fire inside a stop-hook continuation
         root = os.path.join(payload.get("cwd") or os.getcwd(), ".omd")
-        expiry_notice = expire_stale_slugless(root)  # G7: before listing pendings
+        expiry_notice = purge_slugless_sentinel(root)  # before listing pendings
         items = suppress_notified_carryovers(
             root, pending_sentinels(root), payload.get("session_id"))
         gaps = stage_evidence_gaps(root)

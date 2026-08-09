@@ -147,20 +147,25 @@ def test_arm_writes_slug_sentinel(tmp_path):
     assert sentinel.is_file()
 
 
-def test_arm_writes_global_sentinel_when_slug_unknown(tmp_path):
-    """b) build 명령 + slug 단서 없음 → .omd/.verify-pending 생성."""
+def test_no_slug_context_arms_nothing_but_still_reminds(tmp_path):
+    """b) v0.6.4 계약 역전: build 명령이라도 slug 단서가 없으면 센티널을 만들지
+    않는다. 구계약(루트 센티널 무장)은 Stop 에서 "(slug unknown)" 이라 아무도
+    조치할 수 없고 그 워크스페이스에서 clear 도 안 됐다. 리마인더 자체는 그대로
+    발화하므로 "verify 하고 done 선언하라" 넛지는 유지된다."""
     (tmp_path / ".omd").mkdir()
-    run_hook("python3 build_deck.py", cwd=str(tmp_path))
-    sentinel = tmp_path / ".omd" / ".verify-pending"
-    assert sentinel.is_file()
-    nested = tmp_path / ".omd" / "mydeck" / ".verify-pending"
-    assert not nested.exists()
+    out = run_hook("python3 build_deck.py", cwd=str(tmp_path))
+    assert "document-integrity" in out
+    assert not (tmp_path / ".omd" / ".verify-pending").exists()
+    assert not (tmp_path / ".omd" / "mydeck" / ".verify-pending").exists()
 
 
 def test_clear_removes_all_sentinels_and_stays_silent(tmp_path):
-    """c) pdftoppm 명령 → 기존 센티널 전부 제거, 리마인더 미발화."""
+    """c) pdftoppm 명령 → 기존 센티널 전부 제거, 리마인더 미발화. 루트 센티널은
+    v0.6.4 이후 무장되지 않으므로 구버전 잔재를 직접 심어 광역 clear 계약을
+    그대로 검증한다."""
     (tmp_path / ".omd").mkdir()
-    run_hook("python3 build_deck.py", cwd=str(tmp_path))
+    (tmp_path / ".omd" / ".verify-pending").write_text(
+        json.dumps({"armed_at": time.time(), "command_head": "legacy"}))
     run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
     assert (tmp_path / ".omd" / ".verify-pending").is_file()
     assert (tmp_path / ".omd" / "mydeck" / ".verify-pending").is_file()
@@ -199,7 +204,7 @@ def test_arm_fail_open_when_omd_uncreatable(tmp_path):
         [sys.executable, str(HOOK)],
         input=json.dumps({
             "tool_name": "Bash",
-            "tool_input": {"command": "python3 build_deck.py"},
+            "tool_input": {"command": "python3 outputs/mydeck/build_deck.py"},
             "cwd": str(tmp_path),
         }),
         capture_output=True, text=True,
@@ -218,11 +223,13 @@ def test_arm_write_failure_still_fires_reminder_no_half_sentinel(tmp_path):
     omd.mkdir()
     os.chmod(omd, 0o555)  # read+exec only: mkstemp() cannot create a tmp file here
     try:
-        out = run_hook("python3 build_deck.py", cwd=str(tmp_path))
+        # slug 있는 명령이어야 arm 이 실제로 시도된다 (v0.6.4: slug 없으면 애초에
+        # 쓰지 않으므로 쓰기 실패 경로를 못 탄다 — 테스트가 공허해짐).
+        out = run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
     finally:
         os.chmod(omd, 0o755)
     assert "document-integrity" in out
-    assert not (omd / ".verify-pending").exists()
+    assert not (omd / "mydeck" / ".verify-pending").exists()
 
 
 # ── HG-3: 리마인더 content-hash 쿨다운 ───────────────────────────────
@@ -405,8 +412,9 @@ def test_office_verify_signals_regression(tmp_path):
     sentinel.write_text("{}")
     run_hook(f"pdftoppm -png outputs/{slug}/x.pdf p", cwd=str(tmp_path))
     assert not sentinel.exists()
-    run_hook("python3 -c 'from pptx import Presentation'", cwd=str(tmp_path))
-    assert (tmp_path / ".omd" / ".verify-pending").is_file()  # slug 무언급 → 루트 센티널
+    run_hook("python3 -c 'from pptx import Presentation'",
+             cwd=str(tmp_path / ".omd" / slug))
+    assert sentinel.is_file()  # 빌드 신호는 여전히 arm (slug 는 cwd 에서 유도, D1)
 
 
 def test_md_reminder_names_site_gate(tmp_path, monkeypatch):
@@ -449,90 +457,11 @@ def test_arm_never_fabricates_omd_root(tmp_path):
 def test_hyphenated_pytest_like_build_script_still_arms(tmp_path):
     """'pytest'가 하이픈 파일명의 부분 문자열일 뿐이면 테스트 실행이 아니다 —
     진짜 빌드 스크립트는 여전히 arm (verifier finding 2026-07-16)."""
-    (tmp_path / ".omd").mkdir()
-    out = run_hook("python3 scripts/pytest-utils-report-deck.py output.pptx", cwd=str(tmp_path))
-    assert "document-integrity" in out
-    assert (tmp_path / ".omd" / ".verify-pending").is_file()
-
-
-# ── v0.6.4: 검증 스크립트를 빌드로 오인 (2026-08-05 koopman-seminar) ──
-#
-# `assert_deck.py` 는 덱을 *검사*하는데 RUN_SCRIPT_RE 의 `deck` 토큰만으로 빌드로
-# 잡혀, 진짜 빌드가 끝나고 versioning 까지 마친 4분 뒤에 sentinel 을 armed 했다.
-# 즉 "검증했더니 검증이 필요하다"는 경고가 켜졌고, 다음 날 세션까지 stale 로 남았다.
-# 검사기를 대상 산출물 이름으로 짓는 건 통상 관례이므로 `deck` 토큰 단독으로
-# 판정할 수 없다 — test_ 에만 있던 carve-out 을 나머지 검증 접두/접미로 넓힌다.
-
-def test_assert_script_named_after_the_deck_stays_silent(tmp_path):
-    """python3 assert_deck.py — 2026-08-05 오탐 재현 커맨드 그대로."""
-    (tmp_path / ".omd").mkdir()
-    out = run_hook("cd .omd/koopman-seminar/build && python3 assert_deck.py",
+    slug = _with_slug(tmp_path, "mydeck")
+    out = run_hook("python3 outputs/mydeck/scripts/pytest-utils-report-deck.py out.pptx",
                    cwd=str(tmp_path))
-    assert out.strip() == ""
-    assert not (tmp_path / ".omd" / ".verify-pending").exists()
-    assert not (tmp_path / ".omd" / "koopman-seminar" / ".verify-pending").exists()
-
-
-def test_every_verification_prefix_stays_silent():
-    """검사 성격의 접두는 문서 토큰을 달고 있어도 빌드가 아니다."""
-    for name in ("assert_deck.py", "check_slides.py", "verify_docx.py",
-                 "validate_pptx.py", "inspect_doc.py", "audit_deck.py",
-                 "lint_presentation.py"):
-        assert not is_doc_build(f"python3 {name}"), name
-
-
-def test_verification_suffix_stays_silent():
-    """접미형(`deck_audit.py`)도 대칭으로 제외 — `_test.py` 와 같은 모양."""
-    for name in ("deck_audit.py", "slides_check.py", "doc_verify.py"):
-        assert not is_doc_build(f"python3 {name}"), name
-
-
-def test_carve_out_does_not_swallow_real_builders():
-    """오버리치 방지: 검증 어휘가 *접두/접미가 아닌* 진짜 빌더는 계속 arm."""
-    for name in ("build_deck.py", "deck_builder.py", "build_slides.py",
-                 "make_presentation.py", "rebuild_docx.py"):
-        assert is_doc_build(f"python3 {name}"), name
-
-
-# ── v0.6.5: 인라인 실행 안의 스크립트명은 데이터 (2026-08-06, v0.6.4 진단 중 자가 발견) ──
-#
-# `python3 -c` / `python3 - <<EOF` 는 스크립트 *파일*을 실행하지 않는다. 인자·heredoc
-# 본문에 등장하는 build_deck.py 는 논의 대상 문자열이지 실행되는 프로그램이 아니다.
-# v0.6.4 를 진단하던 one-liner 두 개가 정확히 이렇게 sentinel 을 armed 했다.
-
-def test_inline_c_flag_with_script_name_in_argument_stays_silent(tmp_path):
-    """python3 -c "…'build_deck.py'…" — 실행이 아니라 데이터. 재현 형태 그대로."""
-    (tmp_path / ".omd").mkdir()
-    out = run_hook("""python3 -c "print('python3 build_deck.py')" """, cwd=str(tmp_path))
-    assert out.strip() == ""
-    assert not (tmp_path / ".omd" / ".verify-pending").exists()
-
-
-def test_inline_execution_variants_stay_silent():
-    """-c, 플래그가 앞에 붙은 -c, stdin(bare -) 모두 파일 실행이 아니다."""
-    for cmd in ('python3 -c "x = \'build_deck.py\'"',
-                'python3 -u -c "x = \'build_deck.py\'"',
-                'python -c "x = \'make_presentation.py\'"',
-                "python3 - <<'EOF'\nx = 'build_deck.py'\nEOF"):
-        assert not is_doc_build(cmd), cmd
-
-
-def test_inline_carve_out_keeps_the_piped_build_protected():
-    """v0.6.3 이 지키기로 한 `build_deck.py | tail` 은 그대로 arm — 파이프에는 -c 가 없다."""
-    assert is_doc_build("python3 build_deck.py | tail -5")
-    assert is_doc_build("python3 outputs/mydeck/build_deck.py")
-
-
-def test_inline_carve_out_does_not_touch_the_signal_route():
-    """엔진을 인라인으로 진짜 돌려 덱을 만드는 -c 는 signal route 로 여전히 잡힌다."""
-    assert is_doc_build(
-        'python3 -c "from pptx import Presentation; Presentation().save(\'a.pptx\')"')
-
-
-def test_dash_lookahead_does_not_swallow_m_or_u_flags():
-    """bare-dash 분기는 `-` 뒤 공백/EOL 을 요구 — -m/-u 를 stdin 모드로 오인하지 않는다."""
-    assert is_doc_build("python3 -u build_deck.py")
-    assert not is_doc_build("python3 -m pytest tests/test_deck.py")
+    assert "document-integrity" in out
+    assert (tmp_path / ".omd" / slug / ".verify-pending").is_file()
 
 
 # Recovered verbatim from vault session 4f56a5f0 (2026-07-15): a robotics
@@ -744,3 +673,315 @@ def test_openpyxl_save_with_space_still_builds():
     assert is_doc_build(
         "python3 -c 'from openpyxl import load_workbook; "
         "wb=load_workbook(\"t.xlsx\"); wb.save (\"o.xlsx\")'")
+
+
+# ── v0.6.4: a VERIFY render must not arm the sentinel it verifies (cause A) ──
+# 2026-07-27 incident, recovered verbatim from session transcript 3230a10e
+# (ts 2026-07-24T07:44:47Z): a docx integrity check rendered the file to PDF in
+# $CLAUDE_JOB_DIR/tmp to count pages — the card's own "fresh render evidence"
+# step. `--convert-to` matched BUILD_SIGNALS, is_verify_run did not match, so
+# the verify step ARMED verify-pending. Note the trailing echo also names
+# `python-docx`, so narrowing only the convert-family signal is not enough —
+# the whole signal route must yield to the inspection verdict.
+SOFFICE_VERIFY_RENDER_CMD = """DOCX="/Users/<you>/workspace/91_Inbox/(2026.07.24)product.docx"
+OUTDIR="$CLAUDE_JOB_DIR/tmp/render"
+mkdir -p "$OUTDIR"
+SOFFICE=""
+for c in soffice /Applications/LibreOffice.app/Contents/MacOS/soffice libreoffice; do \
+  command -v "$c" >/dev/null 2>&1 && SOFFICE="$c" && break; done
+if [ -n "$SOFFICE" ]; then
+  "$SOFFICE" --headless --convert-to pdf --outdir "$OUTDIR" "$DOCX" >/dev/null 2>&1
+  PDF=$(ls "$OUTDIR"/*.pdf 2>/dev/null | head -1)
+  echo "RENDER OK -> $PDF pages=$(pdfinfo "$PDF" | awk '/Pages/{print $2}')"
+else
+  echo "soffice not found — skipping render (zip CRC + python-docx parse already passed)"
+fi"""
+
+
+def test_verify_render_to_scratch_outdir_does_not_arm(tmp_path):
+    """A1) 사고 명령 원문: 스크래치 --outdir 로의 변환은 검증 렌더 → 무장 금지."""
+    slug = _with_slug(tmp_path, "mydeck")
+    assert not is_doc_build(SOFFICE_VERIFY_RENDER_CMD)
+    out = run_hook(SOFFICE_VERIFY_RENDER_CMD, cwd=str(tmp_path))
+    assert out.strip() == ""
+    assert not (tmp_path / ".omd" / ".verify-pending").exists()
+    assert not (tmp_path / ".omd" / slug / ".verify-pending").exists()
+
+
+def test_verify_render_inside_slug_context_does_not_rearm(tmp_path):
+    """A2) slug 컨텍스트가 있어도 마찬가지 — 검증 직후 "미검증" 경고가 뜨는
+    역전이 원인 B 와 독립적으로 남아 있으면 안 된다."""
+    slug = _with_slug(tmp_path, "utracker-seminar")
+    cmd = (f"soffice --headless --convert-to pdf --outdir /tmp/omd-render "
+           f"outputs/{slug}/current.pptx")
+    assert not is_doc_build(cmd)
+    assert run_hook(cmd, cwd=str(tmp_path)).strip() == ""
+    assert not (tmp_path / ".omd" / slug / ".verify-pending").exists()
+
+
+def test_delivery_convert_into_outputs_still_arms(tmp_path):
+    """A3) 회귀: 납품 변환(카드 규칙 = outputs/<slug>/ 로 쓴다)은 여전히 빌드."""
+    slug = _with_slug(tmp_path, "mydeck")
+    cmd = (f"soffice --headless --convert-to pdf --outdir outputs/{slug}/ "
+           f"outputs/{slug}/current.pptx")
+    assert is_doc_build(cmd)
+    run_hook(cmd, cwd=str(tmp_path))
+    assert (tmp_path / ".omd" / slug / ".verify-pending").is_file()
+
+
+def test_convert_without_outdir_still_arms(tmp_path):
+    """A4) 회귀: --outdir 자체가 없으면 소스 옆에 쓰므로 빌드 판정 유지."""
+    assert is_doc_build("soffice --headless --convert-to pdf deck.pptx")
+
+
+def test_scratch_render_still_arms_when_a_doc_script_runs(tmp_path):
+    """A5) 스크래치 렌더가 붙어 있어도 doc-네임 스크립트 실행은 빌드다
+    (v0.6.3 이 세운 '스크립트 경로는 무효화되지 않는다' 계약 유지)."""
+    slug = _with_slug(tmp_path, "mydeck")
+    cmd = (f"python3 outputs/{slug}/build_deck.py && "
+           f"soffice --convert-to pdf --outdir /tmp/r outputs/{slug}/current.pptx")
+    assert is_doc_build(cmd)
+    run_hook(cmd, cwd=str(tmp_path))
+    assert (tmp_path / ".omd" / slug / ".verify-pending").is_file()
+
+
+def test_outdir_variable_is_resolved_not_taken_literally():
+    """A6) `--outdir "$OUTDIR"` 는 변수명이 아니라 담긴 경로로 판정해야 한다 —
+    사고 명령이 실제로 쓰는 형태."""
+    scratch = """OUT="$CLAUDE_JOB_DIR/tmp"
+soffice --convert-to pdf --outdir "$OUT" a.docx"""
+    delivery = """OUT="outputs/mydeck"
+soffice --convert-to pdf --outdir "$OUT" a.docx"""
+    assert not is_doc_build(scratch)
+    assert is_doc_build(delivery)
+
+
+# ── v0.6.4: slug 컨텍스트 없는 무장 금지 (cause B) ───────────────────────────
+
+def test_vault_incident_class_cannot_arm_even_if_misclassified(tmp_path):
+    """B1) G7 이 막으려던 원래 사고(2026-07-15 vault): 오분류된 명령이 문서 이력
+    없는 워크스페이스에 영구 센티널을 심었다. 이제는 오분류되더라도 slug 가
+    없으므로 심을 곳이 없다 — TTL(G7) 없이도 구조적으로 불가능."""
+    (tmp_path / ".omd").mkdir()
+    # 일부러 빌드로 분류되는 slug 없는 명령 (분류 자체는 True)
+    assert is_doc_build("python3 -c 'from pptx import Presentation; Presentation()'")
+    run_hook("python3 -c 'from pptx import Presentation; Presentation()'",
+             cwd=str(tmp_path))
+    assert list((tmp_path / ".omd").glob("**/.verify-pending")) == []
+
+
+def test_slug_from_cwd_still_arms(tmp_path):
+    """B2) 회귀: slug 를 cwd 에서 유도할 수 있으면 여전히 무장한다 (D1 계약)."""
+    slug_dir = tmp_path / ".omd" / "mydeck"
+    slug_dir.mkdir(parents=True)
+    run_hook("python3 build_deck.py", cwd=str(slug_dir))
+    assert (slug_dir / ".verify-pending").is_file()
+
+
+# ── v0.6.4: 센티널이 스스로를 설명한다 (부수결함 2) ──────────────────────────
+
+def test_sentinel_records_matching_signal(tmp_path):
+    """마커에 어떤 규칙이 무장시켰는지 기록 — 원인 규명에 세션 전사 발굴이
+    필요했던 2026-07-27 진단 불능 해소."""
+    slug = _with_slug(tmp_path, "mydeck")
+    run_hook("python3 outputs/mydeck/build_deck.py", cwd=str(tmp_path))
+    data = json.loads((tmp_path / ".omd" / slug / ".verify-pending").read_text())
+    assert data["signal"] == "script:build_deck.py"
+
+    (tmp_path / ".omd" / slug / ".verify-pending").unlink()
+    run_hook("python3 -c 'from pptx import Presentation'",
+             cwd=str(tmp_path / ".omd" / slug))
+    data = json.loads((tmp_path / ".omd" / slug / ".verify-pending").read_text())
+    assert data["signal"] == "signal:from pptx"
+
+
+def test_command_head_survives_a_long_absolute_path(tmp_path):
+    """head 80자가 절대경로 하나로 소진돼 진단이 불가능했다 — 200자로."""
+    slug = _with_slug(tmp_path, "mydeck")
+    long_path = "/Users/x/" + "verylongdirectoryname/" * 5
+    run_hook(f"python3 outputs/mydeck/build_deck.py {long_path}deck.pptx",
+             cwd=str(tmp_path))
+    data = json.loads((tmp_path / ".omd" / slug / ".verify-pending").read_text())
+    assert len(data["command_head"]) > 80
+
+
+# ── C (v0.6.5): 명령 안의 `cd` 가 훅에 보이지 않는다 (2026-07-27 두 번째 사고) ──
+# PostToolUse 페이로드의 cwd 는 *세션* cwd 다. 명령이 `cd <other-repo> && …` 로
+# 다른 저장소에 들어가 거기서만 작업해도, 훅은 세션 cwd 기준으로 root 를 잡아
+# **이 워크스페이스**의 .omd/ 에 센티널을 떨어뜨린다. 실제 사고: omd 훅 자체를
+# 조사하려고 oh-my-docs/hooks 로 cd 해서 돌린 힙독이, 무관한 워크스페이스의
+# .omd/utracker-seminar/ 를 "미검증"으로 낙인찍었다 (v0.6.4 로도 재현됨 —
+# v0.6.4 의 "slug 없으면 arm 안 함"은 slug 가 *문자열로 언급*되면 통과한다).
+
+HOOK_PROBE_CMD_TMPL = (
+    "cd {target} && python3 - <<'PY'\n"
+    "import docs_verify_emit as m\n"
+    'print(m.is_doc_build("soffice --headless --convert-to pdf x.docx"))\n'
+    'print(m._slug_of(".omd/utracker-seminar/build/deck.py", ""))\n'
+    "PY"
+)
+
+
+def _workspace_with_slug(tmp_path, slug="utracker-seminar"):
+    d = tmp_path / "workspace" / ".omd" / slug
+    d.mkdir(parents=True)
+    return tmp_path / "workspace", d / ".verify-pending"
+
+
+def test_cd_into_other_repo_arms_nothing_in_this_workspace(tmp_path):
+    """C) `cd <다른 repo>` 로 시작하는 명령은 이 워크스페이스의 센티널을 건드리지
+    않는다 — 2026-07-27 사고 재현본. 그 repo 엔 .omd 가 없으니 아무데도 안 무장."""
+    workspace, sentinel = _workspace_with_slug(tmp_path)
+    other = tmp_path / "oh-my-docs" / "hooks"
+    other.mkdir(parents=True)
+    run_hook(HOOK_PROBE_CMD_TMPL.format(target=other), cwd=str(workspace))
+    assert not sentinel.exists(), "다른 repo 로 cd 한 명령이 이 워크스페이스를 오염시킴"
+
+
+def test_same_command_without_cd_still_arms(tmp_path):
+    """C-대조군) 같은 명령이라도 `cd` 없이 이 워크스페이스에서 돌면 그대로 무장한다
+    — 수정이 '전부 침묵'이 아니라 *어디서 돌았나*를 본다는 증거."""
+    workspace, sentinel = _workspace_with_slug(tmp_path)
+    body = HOOK_PROBE_CMD_TMPL.format(target="X").split("&&", 1)[1].lstrip()
+    run_hook(body, cwd=str(workspace))
+    assert sentinel.is_file()
+
+
+def test_cd_into_this_workspace_still_arms(tmp_path):
+    """C-회귀) 워크스페이스 안으로 cd 하는 정상 빌드는 계속 무장한다."""
+    workspace, _ = _workspace_with_slug(tmp_path, "mydeck")
+    sentinel = workspace / ".omd" / "mydeck" / ".verify-pending"
+    run_hook(f"cd {workspace} && python3 .omd/mydeck/build_deck.py", cwd=str(workspace))
+    assert sentinel.is_file()
+
+
+def test_relative_cd_resolves_against_session_cwd(tmp_path):
+    """C-상대경로) `cd sub && …` 는 세션 cwd 기준으로 해석한다."""
+    workspace, _ = _workspace_with_slug(tmp_path, "mydeck")
+    (workspace / "sub").mkdir()
+    run_hook("cd sub && python3 .omd/mydeck/build_deck.py", cwd=str(workspace))
+    assert not (workspace / "sub" / ".omd").exists(), "없는 root 를 날조하면 안 됨"
+    assert not (workspace / ".omd" / "mydeck" / ".verify-pending").exists()
+
+
+def test_cd_lead_re_is_not_redos():
+    """CD_LEAD_RE 도 같은 규율을 지킨다 — 앵커 1회 매치, 바깥 반복 없음, 세 분기의
+    구분자 집합이 disjoint. 최악 케이스는 닫히지 않은 따옴표(첫 분기가 끝까지 훑고
+    실패한 뒤 나머지 분기로 넘어감)."""
+    import time as _t
+    for cmd in ('cd "' + "a" * 4000,
+                "cd " + "a" * 4000,
+                "cd " + "a/" * 2000 + " && python3 build.py"):
+        start = _t.perf_counter()
+        mod._command_cwd(cmd, "/tmp")
+        elapsed = _t.perf_counter() - start
+        assert elapsed < 0.5, f"_command_cwd took {elapsed:.3f}s — backtracking regression"
+
+
+# ── v0.6.4 (ported from main): 검증 스크립트를 빌드로 오인 (2026-08-05 koopman-seminar) ──
+#
+# `assert_deck.py` 는 덱을 *검사*하는데 RUN_SCRIPT_RE 의 `deck` 토큰만으로 빌드로
+# 잡혀, 진짜 빌드가 끝나고 versioning 까지 마친 4분 뒤에 sentinel 을 armed 했다.
+# round2/round3 은 이 축을 다루지 않았으므로(그쪽은 verify-render 역전·slug-context·
+# cd-tracking 축), main 의 v0.6.4 를 그대로 이식해 커버리지 유지.
+
+def test_assert_script_named_after_the_deck_stays_silent(tmp_path):
+    """python3 assert_deck.py — 2026-08-05 오탐 재현 커맨드 그대로."""
+    (tmp_path / ".omd").mkdir()
+    out = run_hook("cd .omd/koopman-seminar/build && python3 assert_deck.py",
+                   cwd=str(tmp_path))
+    assert out.strip() == ""
+    assert not (tmp_path / ".omd" / ".verify-pending").exists()
+    assert not (tmp_path / ".omd" / "koopman-seminar" / ".verify-pending").exists()
+
+
+def test_every_verification_prefix_stays_silent():
+    """검사 성격의 접두는 문서 토큰을 달고 있어도 빌드가 아니다."""
+    for name in ("assert_deck.py", "check_slides.py", "verify_docx.py",
+                 "validate_pptx.py", "inspect_doc.py", "audit_deck.py",
+                 "lint_presentation.py"):
+        assert not is_doc_build(f"python3 {name}"), name
+
+
+def test_verification_suffix_stays_silent():
+    """접미형(`deck_audit.py`)도 대칭으로 제외 — `_test.py` 와 같은 모양."""
+    for name in ("deck_audit.py", "slides_check.py", "doc_verify.py"):
+        assert not is_doc_build(f"python3 {name}"), name
+
+
+def test_carve_out_does_not_swallow_real_builders():
+    """오버리치 방지: 검증 어휘가 *접두/접미가 아닌* 진짜 빌더는 계속 arm."""
+    for name in ("build_deck.py", "deck_builder.py", "build_slides.py",
+                 "make_presentation.py", "rebuild_docx.py"):
+        assert is_doc_build(f"python3 {name}"), name
+
+
+# ── v0.6.5 (ported from main): 인라인 실행 안의 스크립트명은 데이터 (2026-08-06) ──
+#
+# `python3 -c` / `python3 - <<EOF` 는 스크립트 *파일*을 실행하지 않는다. 인자·heredoc
+# 본문에 등장하는 build_deck.py 는 논의 대상 문자열이지 실행되는 프로그램이 아니다.
+
+def test_inline_c_flag_with_script_name_in_argument_stays_silent(tmp_path):
+    """python3 -c "…'build_deck.py'…" — 실행이 아니라 데이터. 재현 형태 그대로."""
+    (tmp_path / ".omd").mkdir()
+    out = run_hook("""python3 -c "print('python3 build_deck.py')" """, cwd=str(tmp_path))
+    assert out.strip() == ""
+    assert not (tmp_path / ".omd" / ".verify-pending").exists()
+
+
+def test_inline_execution_variants_stay_silent():
+    """-c, 플래그가 앞에 붙은 -c, stdin(bare -) 모두 파일 실행이 아니다."""
+    for cmd in ('python3 -c "x = \'build_deck.py\'"',
+                'python3 -u -c "x = \'build_deck.py\'"',
+                'python -c "x = \'make_presentation.py\'"',
+                "python3 - <<'EOF'\nx = 'build_deck.py'\nEOF"):
+        assert not is_doc_build(cmd), cmd
+
+
+def test_inline_carve_out_keeps_the_piped_build_protected():
+    """v0.6.3 이 지키기로 한 `build_deck.py | tail` 은 그대로 arm — 파이프에는 -c 가 없다."""
+    assert is_doc_build("python3 build_deck.py | tail -5")
+    assert is_doc_build("python3 outputs/mydeck/build_deck.py")
+
+
+def test_inline_carve_out_does_not_touch_the_signal_route():
+    """엔진을 인라인으로 진짜 돌려 덱을 만드는 -c 는 signal route 로 여전히 잡힌다."""
+    assert is_doc_build(
+        'python3 -c "from pptx import Presentation; Presentation().save(\'a.pptx\')"')
+
+
+def test_dash_lookahead_does_not_swallow_m_or_u_flags():
+    """bare-dash 분기는 `-` 뒤 공백/EOL 을 요구 — -m/-u 를 stdin 모드로 오인하지 않는다."""
+    assert is_doc_build("python3 -u build_deck.py")
+    assert not is_doc_build("python3 -m pytest tests/test_deck.py")
+
+
+# ── v0.6.6: interaction between the ported main axis and round2/round3's axis ──
+
+def test_checker_script_inside_cd_into_other_repo_stays_silent(tmp_path):
+    """VERIFY_SCRIPT_RE(체커) + CD_LEAD_RE(다른 repo cd) 두 축이 겹쳐도 여전히
+    침묵 — 체커는 애초에 빌드 판정을 못 받으므로 어느 워크스페이스에도 arm 되지 않는다."""
+    other_repo = tmp_path / "other-repo"
+    (other_repo / ".omd" / "mydeck").mkdir(parents=True)
+    workspace = tmp_path / "workspace"
+    (workspace / ".omd").mkdir(parents=True)
+    out = run_hook(f"cd {other_repo} && python3 .omd/mydeck/assert_deck.py",
+                   cwd=str(workspace))
+    assert out.strip() == ""
+    assert not (other_repo / ".omd" / "mydeck" / ".verify-pending").exists()
+    assert not (workspace / ".omd" / ".verify-pending").exists()
+
+
+def test_inline_heredoc_editing_a_wiki_page_about_pptx_still_arms_on_real_signal(tmp_path):
+    """알려진 잔여 갭(ponytail 주석 참고, 2026-08-09): heredoc 이 실제로 pptx 엔진을
+    돌리면(save 호출 포함) 여전히 정당하게 arm 되어야 한다 — 텍스트 파일 편집과
+    실제 엔진 호출을 뒤섞은 회귀는 없는지 고정."""
+    (tmp_path / ".omd" / "mydeck").mkdir(parents=True)
+    cmd = ("python3 - <<'PY'\n"
+           "from pptx import Presentation\n"
+           "p = Presentation()\n"
+           "p.save('.omd/mydeck/out.pptx')\n"
+           "PY")
+    out = run_hook(cmd, cwd=str(tmp_path))
+    assert "document-integrity" in out
+    assert (tmp_path / ".omd" / "mydeck" / ".verify-pending").is_file()
