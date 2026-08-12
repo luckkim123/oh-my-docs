@@ -371,6 +371,25 @@ def test_render_html_no_units_flag_detail_survives_empty_panel_strip():
     assert "the Outline section has no unit rows" in out
 
 
+FOOTER_SENTENCE = ("`GAPS=0` means nothing mechanical is missing — it is <strong>not</strong> "
+                    "a judgment that the structure is good.")
+
+
+def test_render_html_carries_the_disclaimer_footer_when_clean():
+    # gate1.html is a self-contained file a user keeps/forwards without the
+    # skill's own report text riding along — the disclaimer must travel
+    # with the page itself, not just the chat turn that produced it.
+    outline = parse_outline(COMPLETE)
+    out = render_html(outline, flags(outline))
+    assert FOOTER_SENTENCE in out
+
+
+def test_render_html_carries_the_disclaimer_footer_when_defective():
+    outline = parse_outline(DEFECTIVE)
+    out = render_html(outline, flags(outline))
+    assert FOOTER_SENTENCE in out
+
+
 def test_main_on_healthy_outline_returns_0_writes_file_and_prints_gaps_0(tmp_path, capsys):
     input_path = tmp_path / "outline.md"
     input_path.write_text(COMPLETE, encoding="utf-8")
@@ -454,6 +473,74 @@ def test_unrelated_unit_not_flagged_when_its_number_collides_with_a_duplicate_po
     foo_blocks = _panel_blocks_for(out, "Foo")
     assert len(foo_blocks) == 2
     assert all("panel--flagged" in b for b in foo_blocks)
+
+
+# Fix round 2 (final-fix wave, 2026-08-12) — regression tests for the four
+# non-blocking-command findings. Each is COMPLETE (or a fresh minimal text)
+# plus exactly the mutation the bug needs.
+
+def test_blank_arc_line_with_content_on_next_line_is_missing_arc_not_clean():
+    # _ARC_RE used \s* before its capture group, which swallows the blank
+    # line's newlines and lets (.+) match the *next paragraph* as the arc —
+    # a genuinely missing arc used to report clean.
+    text = ("## Narrative Arc\n**Arc/Frame**:\n\n"
+            "We chose chronological — **Why**: the audience is new.\n\n"
+            "## Outline\n| 1 | Title | p | m | none |\n")
+    outline = parse_outline(text)
+    assert outline.arc == ""
+    assert codes(text) == {"missing-arc", "no-coverage-check"}
+
+
+def test_bracketed_placeholder_cells_are_missing_field_and_missing_arc():
+    # An entirely unfilled planner template (brackets never replaced) used
+    # to pass clean: only "" and "tbd" were treated as placeholders.
+    text = COMPLETE.replace(
+        "**Arc/Frame**: defense (question - contribution - method - experiment - conclusion) "
+        "— **Why**: a committee judges novelty first, then rigor.",
+        "**Arc/Frame**: [named arc] — **Why**: [one line]")
+    text = text.replace(
+        "| 1 | Title | frame the talk | who, what, and when | none |",
+        "| 1 | [Insert title] | [purpose] | [message] | figure/table/none |")
+    assert codes(text) == {"missing-arc", "missing-field"}
+
+
+def test_ellipsis_and_dash_cells_are_missing_field():
+    text = COMPLETE.replace(
+        "| 3 | Contribution | state what is new | we add an adaptive filter | none |",
+        "| 3 | Contribution | … | - | none |")
+    assert codes(text) == {"missing-field"}
+
+
+def test_required_asset_none_still_not_flagged_after_placeholder_widening():
+    # Guard the asymmetry the widening must not collapse: "none" stays a
+    # legitimate Required-asset value, not a placeholder.
+    assert codes(COMPLETE) == set()
+
+
+def test_escaped_pipe_in_a_cell_does_not_shift_later_columns():
+    text = COMPLETE.replace(
+        "| 1 | Title | frame the talk | who, what, and when | none |",
+        r"| 1 | Before \| After | compare | the delta is big | figure |")
+    outline = parse_outline(text)
+    unit = outline.units[0]
+    assert unit.name == "Before | After"
+    assert unit.purpose == "compare"
+    assert unit.message == "the delta is big"
+    assert unit.asset == "figure"
+    assert codes(text) == set()
+
+
+def test_row_with_wrong_cell_count_is_malformed_row():
+    # 6 raw cells (an extra, unescaped "|" split it one column too many) —
+    # padding/truncation to 5 leaves every resulting field non-empty, so
+    # only malformed-row catches it; missing-field would stay silent.
+    text = ("## Narrative Arc\n**Arc/Frame**: x — **Why**: y.\n\n"
+            "## Outline\n| 1 | Title | purpose | message | asset | extra |\n"
+            "## Coverage Check\n- Required sections all placed: yes\n"
+            "- Density limits respected: yes\n")
+    outline = parse_outline(text)
+    assert outline.malformed_rows == [1]
+    assert codes(text) == {"malformed-row"}
 
 
 def test_missing_field_flags_panel_by_position_not_by_number_value():

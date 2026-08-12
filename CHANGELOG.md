@@ -33,7 +33,8 @@ Gate 1 사용자 승인이 근거로 삼는 아웃라인이 그동안 경로를 
   스크립트 자체 테스트 41건(`tests/test_omd_outline_view.py`).
 - **9종 기계적 갭 탐지** — `missing-arc`(Arc/Frame 또는 Why 누락) · `no-units`(Outline
   섹션에 유닛 행 없음) · `missing-field`(유닛의 필수 컬럼/asset 누락) · `number-gap`(유닛
-  번호 결번) · `duplicate-unit`(유닛 번호 중복) · `no-coverage-check`(Coverage Check
+  번호가 1..N 연속이 아님 — 결번·중복·순서 뒤바뀜 모두 포함) · `duplicate-unit`(두 유닛의
+  이름(Slide/Section)이 동일 — 번호 중복이 아니라 이름 중복) · `no-coverage-check`(Coverage Check
   섹션 누락) · `coverage-unresolved` · `density-unresolved` · `open-questions`(미해결
   항목 잔존). **이 렌더러는 부재(absence)만 탐지하며 품질을 판단하지 않는다** —
   `GAPS=0`은 "기계적으로 빠진 게 없다"는 뜻이지 "구조가 좋다"는 판정이 아니다. 이 구분을

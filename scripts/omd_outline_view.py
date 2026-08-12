@@ -33,13 +33,41 @@ class Outline:
     coverage_density: str | None = None
     has_coverage_check: bool = False
     questions: list[str] = field(default_factory=list)
+    # 1-based reading-order positions of Outline rows that did not split into
+    # exactly 5 cells (see _parse_units) — a malformed-row flag, not silently
+    # padded/truncated into a wrong-shaped Unit.
+    malformed_rows: list[int] = field(default_factory=list)
 
 
-_ARC_RE = re.compile(r"\*\*Arc/Frame\*\*:\s*(.+)")
+# [ \t]*, not \s* — \s matches a newline, so \s* before the capture group
+# would swallow a blank "**Arc/Frame**:" line's trailing newlines and let
+# (.+) bleed into the next line's unrelated text (fix round 2). Bounding the
+# gap to the same line makes an empty Arc/Frame line fail to match here, so
+# _ARC_RE.search() falls through to "no match" and flags() reports
+# missing-arc correctly instead of reading the next paragraph as the arc.
+_ARC_RE = re.compile(r"\*\*Arc/Frame\*\*:[ \t]*(.+)")
 _SECTION_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 _SEP_ROW_RE = re.compile(r"^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
 _SECTIONS_RE = re.compile(r"Required sections all placed:[ \t]*(.*)")
 _DENSITY_RE = re.compile(r"Density limits respected:[ \t]*(.*)")
+# Table-cell split point: a "|" not preceded by a backslash, so an escaped
+# "\|" inside a cell (e.g. "Before \| After") stays in the cell instead of
+# shifting every following column one to the right.
+_ROW_SPLIT_RE = re.compile(r"(?<!\\)\|")
+
+# A cell that carries no real content: known placeholder tokens, or a
+# bracketed template stub like "[Insert title]" / "[named arc]" left over
+# from the planner's own <Output_Format> example (agents/doc-planner.md).
+# Still pure character-presence — no reading for sense.
+_PLACEHOLDER_VALUES = {"", "tbd", "…", "...", "n/a", "-"}
+_BRACKET_PLACEHOLDER_RE = re.compile(r"^\[.+\]$")
+
+
+def _is_placeholder(value: str | None) -> bool:
+    v = (value or "").strip()
+    if v.casefold() in _PLACEHOLDER_VALUES:
+        return True
+    return bool(_BRACKET_PLACEHOLDER_RE.match(v))
 
 
 def _section_body(text: str, heading: str) -> str | None:
@@ -67,7 +95,12 @@ def _section_body(text: str, heading: str) -> str | None:
 
 
 def _parse_row(line: str) -> list[str] | None:
-    """Split a markdown table row into cells, or None if not a row / a separator row."""
+    """Split a markdown table row into cells, or None if not a row / a separator row.
+
+    Splits on unescaped "|" only, so a literal pipe inside a cell must be
+    written "\\|" to survive (fix round: an unescaped mid-cell pipe used to
+    shift every following column one to the right, silently).
+    """
     stripped = line.strip()
     if not stripped.startswith("|"):
         return None
@@ -77,7 +110,7 @@ def _parse_row(line: str) -> list[str] | None:
     inner = stripped[1:]
     if inner.endswith("|"):
         inner = inner[:-1]
-    return [cell.strip() for cell in inner.split("|")]
+    return [cell.strip().replace("\\|", "|") for cell in _ROW_SPLIT_RE.split(inner)]
 
 
 def _parse_number(cell: str) -> int | None:
@@ -87,8 +120,9 @@ def _parse_number(cell: str) -> int | None:
     return None
 
 
-def _parse_units(section: str) -> list[Unit]:
+def _parse_units(section: str) -> tuple[list[Unit], list[int]]:
     units: list[Unit] = []
+    malformed: list[int] = []
     for line in section.splitlines():
         cells = _parse_row(line)
         if cells is None:
@@ -99,11 +133,13 @@ def _parse_units(section: str) -> list[Unit]:
         # always meant to be a number, the safest signal is a literal "#" or "Number".
         if cells and cells[0].strip().lower() in ("#", "number", "no", "no."):
             continue
+        if len(cells) != 5:
+            malformed.append(len(units) + 1)
         padded = (cells + [""] * 5)[:5]
         number = _parse_number(padded[0])
         units.append(Unit(number=number, name=padded[1], purpose=padded[2],
                            message=padded[3], asset=padded[4]))
-    return units
+    return units, malformed
 
 
 def parse_outline(text: str) -> Outline:
@@ -120,7 +156,8 @@ def parse_outline(text: str) -> Outline:
             arc = arc_line.strip()
 
     outline_section = _section_body(text, "Outline")
-    units = _parse_units(outline_section) if outline_section is not None else []
+    units, malformed_rows = (_parse_units(outline_section) if outline_section is not None
+                              else ([], []))
 
     coverage_section = _section_body(text, "Coverage Check")
     has_coverage_check = coverage_section is not None
@@ -144,7 +181,8 @@ def parse_outline(text: str) -> Outline:
                     coverage_sections=coverage_sections,
                     coverage_density=coverage_density,
                     has_coverage_check=has_coverage_check,
-                    questions=questions)
+                    questions=questions,
+                    malformed_rows=malformed_rows)
 
 
 @dataclass
@@ -165,7 +203,8 @@ _NO_QUESTION_VALUES = {"none", "n/a", ""}
 
 
 def flags(outline: Outline) -> list[Flag]:
-    """Structural absence checks over a parsed Outline (spec Sec 3.4, 9 codes).
+    """Structural absence checks over a parsed Outline (spec Sec 3.4's 9 codes,
+    plus `malformed-row` — see its definition below for why it was added).
 
     Every check asks only "is a character present or not" — never whether a
     cell's content is good. Pure, never raises, order is first-occurrence
@@ -173,9 +212,9 @@ def flags(outline: Outline) -> list[Flag]:
     """
     out: list[Flag] = []
 
-    arc = (outline.arc or "").strip()
-    arc_why = (outline.arc_why or "").strip()
-    if not arc or not arc_why:
+    arc = outline.arc
+    arc_why = outline.arc_why
+    if _is_placeholder(arc) or _is_placeholder(arc_why):
         out.append(Flag("missing-arc", "Arc/Frame or its Why is missing or empty"))
 
     units = outline.units or []
@@ -185,15 +224,26 @@ def flags(outline: Outline) -> list[Flag]:
         for position, unit in enumerate(units, start=1):
             for column, value in (("name", unit.name), ("purpose", unit.purpose),
                                    ("message", unit.message)):
-                value = (value or "").strip()
-                if not value or value.casefold() == "tbd":
+                if _is_placeholder(value):
                     out.append(Flag("missing-field", f"unit {unit.number}: {column} is missing",
                                      unit_pos=(position,)))
             asset = (unit.asset or "").strip()
-            if asset.casefold() not in _ASSET_NONE_VALUES and (
-                    not asset or asset.casefold() == "tbd"):
+            if asset.casefold() not in _ASSET_NONE_VALUES and _is_placeholder(asset):
                 out.append(Flag("missing-field", f"unit {unit.number}: asset is missing",
                                  unit_pos=(position,)))
+
+        # Not one of the spec's original 9 codes (deferred to implementation
+        # per team-lead review): a row that split into other than 5 cells is
+        # a structural defect distinct from any existing code — no-units
+        # doesn't apply (units exist), missing-field doesn't apply (a
+        # shifted-column row can have every resulting cell non-empty and
+        # still be wrong), and there's no reading-for-sense involved, only
+        # a cell count. Kept out of the exact-code-set tests' expectations
+        # unless a fixture actually trips it.
+        for position in outline.malformed_rows:
+            out.append(Flag("malformed-row",
+                             f"unit at position {position} does not have exactly 5 columns",
+                             unit_pos=(position,)))
 
         expected = list(range(1, len(units) + 1))
         actual = [u.number for u in units]
@@ -376,6 +426,7 @@ h2 {{ font-size: 1rem; color: var(--muted); text-transform: uppercase; letter-sp
   border-radius: 3px;
   padding: 0.1rem 0.4rem;
 }}
+footer {{ margin-top: 2rem; color: var(--muted); font-size: 0.8rem; }}
 </style>
 </head>
 <body>
@@ -393,6 +444,9 @@ h2 {{ font-size: 1rem; color: var(--muted); text-transform: uppercase; letter-sp
 {panel_strip}
     </div>
   </section>
+  <footer>
+    <p>`GAPS=0` means nothing mechanical is missing — it is <strong>not</strong> a judgment that the structure is good.</p>
+  </footer>
 </body>
 </html>
 """

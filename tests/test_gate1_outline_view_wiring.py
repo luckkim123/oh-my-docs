@@ -21,10 +21,31 @@ def _read(rel_path: str) -> str:
 
 # --- Task 5: docs-plan / doc-planner -----------------------------------
 
+ANCHORED_RENDER_COMMAND = "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/omd_outline_view.py"
+
+
 def test_docs_plan_names_the_renderer_and_outline_path():
     body = _read("skills/docs-plan/SKILL.md")
     assert "omd_outline_view.py" in body
     assert ".omd/<slug>/outline.md" in body
+
+
+def test_docs_plan_render_command_is_anchored_to_plugin_root():
+    # Regression guard: "python3 scripts/..." resolves scripts/ relative to
+    # the CALLER's cwd (the user's document project), not the omd plugin
+    # install, and fails with [Errno 2] at runtime. Both --direct (step 4)
+    # and --consensus (step 6c) must use the anchored form.
+    body = _read("skills/docs-plan/SKILL.md")
+    assert body.count(ANCHORED_RENDER_COMMAND) == 2
+    assert "python3 scripts/omd_outline_view.py" not in body
+
+
+def test_docs_plan_notes_nonzero_exit_means_gaps_not_failure():
+    # A Bash-tool caller reads a non-zero exit as failure; main() returns 1
+    # whenever any flag fired (spec Sec 3.3), which is the normal outcome on
+    # a defective outline — exactly when the gap report matters most.
+    body = _read("skills/docs-plan/SKILL.md")
+    assert body.count("non-zero exit means") == 2
 
 
 def test_docs_plan_carries_gaps_zero_sentence_verbatim():
