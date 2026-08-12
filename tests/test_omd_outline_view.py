@@ -18,6 +18,11 @@ sys.modules["omd_outline_view"] = ov   # required before exec: @dataclass under 
 _spec.loader.exec_module(ov)
 
 parse_outline = ov.parse_outline
+flags = ov.flags
+
+
+def codes(text: str) -> set[str]:
+    return {f.code for f in flags(parse_outline(text))}
 
 COMPLETE = """## Narrative Arc
 **Arc/Frame**: defense (question - contribution - method - experiment - conclusion) — **Why**: a committee judges novelty first, then rigor.
@@ -112,3 +117,159 @@ def test_multi_digit_and_dotted_numbers_survive():
     dotted = parse_outline(dotted_text)
     assert len(dotted.units) == 1
     assert dotted.units[0].number is None  # not silently truncated to 4
+
+
+# Task 2 — flags(). Each test is COMPLETE plus exactly one mutation, asserting
+# exact set equality against spec sec 3.4's 9 codes.
+
+def test_complete_trips_no_flags():
+    assert codes(COMPLETE) == set()
+
+
+def test_purpose_cell_emptied_is_missing_field():
+    text = COMPLETE.replace(
+        "| 3 | Contribution | state what is new | we add an adaptive filter | none |",
+        "| 3 | Contribution |  | we add an adaptive filter | none |")
+    assert codes(text) == {"missing-field"}
+
+
+def test_purpose_cell_tbd_is_missing_field():
+    text = COMPLETE.replace(
+        "| 3 | Contribution | state what is new | we add an adaptive filter | none |",
+        "| 3 | Contribution | TBD | we add an adaptive filter | none |")
+    assert codes(text) == {"missing-field"}
+
+
+def test_asset_none_is_legitimate_not_missing_field():
+    # unit 1's asset is already "none" in COMPLETE — guards the vocabulary
+    # mixup ("none" means no-question in Open Questions, but a legitimate
+    # value here in Required asset).
+    assert codes(COMPLETE) == set()
+
+
+def test_outline_table_removed_is_no_units():
+    text = COMPLETE.replace(
+        """## Outline
+| # | Slide/Section | Purpose | Key message | Required asset |
+|---|---------------|---------|-------------|----------------|
+| 1 | Title | frame the talk | who, what, and when | none |
+| 2 | Research question | establish the gap | localization fails under drift | figure |
+| 3 | Contribution | state what is new | we add an adaptive filter | none |
+| 4 | Method | show it is sound | the filter works by re-weighting | figure |
+| 5 | Experiment | show it holds | it beats the baseline on the metric | table |
+
+""", "")
+    assert codes(text) == {"no-units"}
+
+
+def test_arc_line_removed_is_missing_arc():
+    text = COMPLETE.replace(
+        "**Arc/Frame**: defense (question - contribution - method - experiment - conclusion) "
+        "— **Why**: a committee judges novelty first, then rigor.\n", "")
+    assert codes(text) == {"missing-arc"}
+
+
+def test_why_half_emptied_frame_kept_is_missing_arc():
+    text = COMPLETE.replace(
+        "— **Why**: a committee judges novelty first, then rigor.", "— **Why**: ")
+    assert codes(text) == {"missing-arc"}
+
+
+def test_unit_numbers_with_a_gap_is_number_gap():
+    text = (COMPLETE
+            .replace("| 3 | Contribution", "| 4 | Contribution")
+            .replace("| 4 | Method", "| 5 | Method")
+            .replace("| 5 | Experiment", "| 6 | Experiment"))
+    assert codes(text) == {"number-gap"}
+
+
+def test_unit_numbers_with_a_duplicate_number_is_number_gap():
+    text = (COMPLETE
+            .replace("| 3 | Contribution", "| 2 | Contribution")
+            .replace("| 4 | Method", "| 3 | Method")
+            .replace("| 5 | Experiment", "| 4 | Experiment"))
+    assert codes(text) == {"number-gap"}
+
+
+def test_renamed_unit_colliding_with_another_is_duplicate_unit():
+    text = COMPLETE.replace("| 5 | Experiment |", "| 5 | Method |")
+    assert codes(text) == {"duplicate-unit"}
+
+
+def test_coverage_check_section_removed_is_no_coverage_check():
+    text = COMPLETE.replace(
+        """## Coverage Check
+- Required sections all placed: yes
+- Density limits respected: yes
+
+""", "")
+    assert codes(text) == {"no-coverage-check"}
+
+
+def test_sections_line_not_yes_is_coverage_unresolved():
+    text = COMPLETE.replace(
+        "- Required sections all placed: yes",
+        "- Required sections all placed: no — Related Work missing")
+    assert codes(text) == {"coverage-unresolved"}
+
+
+def test_density_line_not_yes_is_density_unresolved():
+    text = COMPLETE.replace(
+        "- Density limits respected: yes",
+        "- Density limits respected: flag: slide 4 title 62 chars")
+    assert codes(text) == {"density-unresolved"}
+
+
+def test_real_open_question_is_open_questions():
+    text = COMPLETE.replace("- none", "- which dataset ships?")
+    assert codes(text) == {"open-questions"}
+
+
+def test_open_questions_section_removed_is_clean():
+    text = COMPLETE.replace(
+        """## Open Questions (if any block the structure)
+- none
+""", "")
+    assert codes(text) == set()
+
+
+def test_open_questions_item_n_a_is_clean():
+    text = COMPLETE.replace("- none", "- n/a")
+    assert codes(text) == set()
+
+
+def test_several_mutations_return_all_their_flags():
+    text = COMPLETE.replace(
+        "**Arc/Frame**: defense (question - contribution - method - experiment - conclusion) "
+        "— **Why**: a committee judges novelty first, then rigor.\n", "")
+    text = text.replace(
+        "| 3 | Contribution | state what is new | we add an adaptive filter | none |",
+        "| 3 | Contribution |  | we add an adaptive filter | none |")
+    text = text.replace(
+        "| 5 | Experiment | show it holds | it beats the baseline on the metric | table |",
+        "| 6 | Experiment | show it holds | it beats the baseline on the metric | table |")
+    text = text.replace(
+        """## Coverage Check
+- Required sections all placed: yes
+- Density limits respected: yes
+
+""", "")
+    text = text.replace("- none", "- which dataset ships?")
+    assert codes(text) == {"missing-arc", "missing-field", "number-gap",
+                            "no-coverage-check", "open-questions"}
+
+
+def test_flags_never_returns_a_code_outside_the_nine():
+    known = {"missing-field", "no-units", "missing-arc", "number-gap",
+             "duplicate-unit", "no-coverage-check", "coverage-unresolved",
+             "density-unresolved", "open-questions"}
+    garbage = ov.Outline(
+        arc="", arc_why="",
+        units=[ov.Unit(number=None, name="", purpose="", message="", asset="")],
+        coverage_sections="no", coverage_density="no",
+        has_coverage_check=True,
+        questions=["what dataset?"],
+    )
+    result = {f.code for f in flags(garbage)}
+    assert result <= known
+    assert flags(garbage)  # ran without raising

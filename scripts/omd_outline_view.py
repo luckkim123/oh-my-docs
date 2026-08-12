@@ -144,9 +144,79 @@ def parse_outline(text: str) -> Outline:
                     questions=questions)
 
 
-def flags(outline: Outline) -> list[str]:
-    """Task 2 — not yet implemented."""
-    raise NotImplementedError("flags() is Task 2")
+@dataclass
+class Flag:
+    code: str
+    detail: str
+
+
+# "none" is a legitimate Required-asset value (nothing needed); it is not a
+# stand-in for "missing". Open Questions uses a separate vocabulary for "no
+# question here" — mixing the two is the trap this module exists to avoid.
+_ASSET_NONE_VALUES = {"none"}
+_NO_QUESTION_VALUES = {"none", "n/a", ""}
+
+
+def flags(outline: Outline) -> list[Flag]:
+    """Structural absence checks over a parsed Outline (spec Sec 3.4, 9 codes).
+
+    Every check asks only "is a character present or not" — never whether a
+    cell's content is good. Pure, never raises, order is first-occurrence
+    while walking the document top to bottom.
+    """
+    out: list[Flag] = []
+
+    arc = (outline.arc or "").strip()
+    arc_why = (outline.arc_why or "").strip()
+    if not arc or not arc_why:
+        out.append(Flag("missing-arc", "Arc/Frame or its Why is missing or empty"))
+
+    units = outline.units or []
+    if not units:
+        out.append(Flag("no-units", "the Outline section has no unit rows"))
+    else:
+        for unit in units:
+            for column, value in (("name", unit.name), ("purpose", unit.purpose),
+                                   ("message", unit.message)):
+                value = (value or "").strip()
+                if not value or value.casefold() == "tbd":
+                    out.append(Flag("missing-field", f"unit {unit.number}: {column} is missing"))
+            asset = (unit.asset or "").strip()
+            if asset.casefold() not in _ASSET_NONE_VALUES and (
+                    not asset or asset.casefold() == "tbd"):
+                out.append(Flag("missing-field", f"unit {unit.number}: asset is missing"))
+
+        expected = list(range(1, len(units) + 1))
+        actual = [u.number for u in units]
+        if actual != expected:
+            out.append(Flag("number-gap", f"expected 1..{len(units)}, saw {actual}"))
+
+        seen: dict[str, int] = {}
+        for position, unit in enumerate(units, start=1):
+            name = (unit.name or "").strip()
+            if not name:
+                continue
+            if name in seen:
+                out.append(Flag("duplicate-unit",
+                                 f"'{name}' appears at units {seen[name]} and {position}"))
+            else:
+                seen[name] = position
+
+    if not outline.has_coverage_check:
+        out.append(Flag("no-coverage-check", "the Coverage Check section is missing"))
+    else:
+        sections = outline.coverage_sections or ""
+        if sections.strip().casefold() != "yes":
+            out.append(Flag("coverage-unresolved", sections))
+        density = outline.coverage_density or ""
+        if density.strip().casefold() != "yes":
+            out.append(Flag("density-unresolved", density))
+
+    for question in (outline.questions or []):
+        if (question or "").strip().casefold() not in _NO_QUESTION_VALUES:
+            out.append(Flag("open-questions", question))
+
+    return out
 
 
 def render_html(outline: Outline, flagged: list[str]) -> str:
