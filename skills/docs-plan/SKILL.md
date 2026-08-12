@@ -32,7 +32,7 @@ Turn the analyzer inventory into a concrete document structure: the structure fr
 
 <Gate>
 **Gate 1 — Structure lock.** Present the structure frame (narrative arc / section preset / quadrant map) + full outline to the user. No artifact exists yet —
-this is where rearranging is cheapest. After approval, build. (For `--consensus`, present both plan.md + outline.)
+this is where rearranging is cheapest. The rendered gap sheet (`.omd/<slug>/gate1.html`) is a mechanical completeness check surfaced alongside the outline, not a substitute for the user's own read of the structure. After approval, build. (For `--consensus`, present both plan.md + outline.)
 </Gate>
 
 <Steps>
@@ -41,7 +41,7 @@ this is where rearranging is cheapest. After approval, build. (For `--consensus`
    `Task(subagent_type="oh-my-docs:doc-planner", ...)`
 2. The planner produces the structure-frame selection (arc / section preset / quadrant map, per the card) + a per-unit outline of purpose, message, and assets.
 3. Confirm that all required sections are placed and that the format density limit (references/formats/<format>.md) is respected.
-4. Present the outline as Gate 1 → approval.
+4. Save the planner's returned block to `.omd/<slug>/outline.md` — the **controller** writes this file; `doc-planner` stays read-only. Render it: `python3 scripts/omd_outline_view.py .omd/<slug>/outline.md -o .omd/<slug>/gate1.html`, and surface it opportunistically — as an artifact where the harness supports one, otherwise the file path (no viewer available is a graceful degrade, never an error). Report the gaps verbatim from the renderer's output. `GAPS=0` means nothing mechanical is missing — it is **not** a judgment that the structure is good, and must never be presented as one. Present the outline + rendered sheet + gap report as Gate 1 → approval.
 
 ### `--consensus` path (sequential — never parallel)
 > ⚠️ The following MUST be sequential (stated three ways):
@@ -53,7 +53,7 @@ this is where rearranging is cheapest. After approval, build. (For `--consensus`
 3c. **[planner architect responsibility]**: not a separate agent — the planner already performs this via steelman/antithesis (T1: doc-architect is not newly created).
 4c. **inspector** dispatch (`doc-inspector`): formative critique of plan.md + outline (4 critic techniques, severity). Does not issue PASS/FAIL.
 5c. **re-review loop**: if the inspector raises critical/important, re-delegate to the planner (back to 2c), then re-critique. Max 5 rounds. On reaching 5, present the best plus "consensus not reached — remaining findings."
-6c. **two-way split save**: `plan.md` (RALPLAN-DR+ADR) + outline (Final single arc). Present both as Gate 1.
+6c. **two-way split save**: save `plan.md` (RALPLAN-DR+ADR, decision process) and the outline to `.omd/<slug>/outline.md` (Final single arc, decision result) — the **controller** writes both; `doc-planner` stays read-only. Render: `python3 scripts/omd_outline_view.py .omd/<slug>/outline.md -o .omd/<slug>/gate1.html`, surfaced opportunistically — as an artifact where the harness supports one, otherwise the file path (no viewer available is a graceful degrade, never an error). Report the gaps verbatim. `GAPS=0` means nothing mechanical is missing — it is **not** a judgment that the structure is good, and must never be presented as one. Present plan.md + outline + rendered sheet + gap report as Gate 1.
 </Steps>
 
 <Output>
