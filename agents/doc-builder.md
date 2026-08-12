@@ -38,7 +38,7 @@ level: 2
   </Constraints>
 
   <Investigation_Protocol>
-    1) Read the approved outline and the analyzer's design-system report.
+    1) Read the approved outline (`.omd/<slug>/outline.md`) and the analyzer's design-system report.
     2) Read references/formats/<format>.md — engine recipe, traps, formula path status, version policy.
     3) If this is a revision, snapshot outputs/<slug>/current.pptx → .omd/<slug>/versions/v{NN}_{YYYY-MM-DD}_{summary}.pptx before editing. (Artifact-set genres: snapshot by copying the whole outputs/<slug>/current/ directory to .omd/<slug>/versions/v{NN}_{YYYY-MM-DD}_{summary}/ — same rule as Constraints.)
     4) Write the build script; place each outline unit; apply the design system.
@@ -56,7 +56,9 @@ level: 2
          - `run.font.name` matches the template's intended font (e.g. Arial, not the theme Calibri) —
            catches the `text_frame.text=` rPr-destruction trap;
          - no placeholder still shows prompt text ("Click to add", `[Insert`, TODO);
-         - the slide count and per-slide expected placeholders match the outline.
+         - the slide count and per-slide expected placeholders match the outline — the
+           `outline_slide_count` assert_shapes.py takes as a parameter comes from
+           `.omd/<slug>/outline.md`.
        If ANY assertion fails, FIX the build script and re-run — never hand off a deck that fails the
        assert, never downgrade an assertion to "looks fine in the PNG". (See references/formats/pptx.md
        "python-pptx high-level API traps" for why each check exists.) For docx/hwpx, assert the
