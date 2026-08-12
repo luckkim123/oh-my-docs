@@ -15,6 +15,39 @@ SSOT: `.claude-plugin/plugin.json` `version`.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-12
+
+Gate 1 사용자 승인이 근거로 삼는 아웃라인이 그동안 경로를 갖지 못했다 — `--direct`
+경로에서는 컨텍스트 창 안에만 존재했고, 세션이 압축되거나 종료되면 승인 대상 자체가
+사라졌다. 이번 릴리스는 아웃라인을 파일로 영속화하고, 그 파일을 검토용 뷰로 렌더링해
+승인이 실제로 무엇을 근거로 하는지 남긴다.
+
+### Added
+
+- **아웃라인 영속화** — `docs-plan`이 Gate 1 승인 전에 아웃라인을 `.omd/<slug>/outline.md`에
+  저장한다(`--direct`/`--consensus` 양쪽 경로). 이전엔 `--direct` 경로에서 아웃라인이
+  컨텍스트 창 안에만 존재해, 세션 압축·종료 후에는 승인 근거를 다시 만들 방법이 없었다.
+- **Gate 1 렌더 뷰** — `scripts/omd_outline_view.py`(`parse_outline`/`flags`/`render_html`/
+  `main`)가 저장된 `outline.md`를 파싱해 `.omd/<slug>/gate1.html`에 스토리보드 패널
+  스트립을 렌더링한다. `docs-plan`이 Gate 1에서 이 렌더를 실행하고 갭을 보고한다.
+  스크립트 자체 테스트 41건(`tests/test_omd_outline_view.py`).
+- **9종 기계적 갭 탐지** — `missing-arc`(Arc/Frame 또는 Why 누락) · `no-units`(Outline
+  섹션에 유닛 행 없음) · `missing-field`(유닛의 필수 컬럼/asset 누락) · `number-gap`(유닛
+  번호 결번) · `duplicate-unit`(유닛 번호 중복) · `no-coverage-check`(Coverage Check
+  섹션 누락) · `coverage-unresolved` · `density-unresolved` · `open-questions`(미해결
+  항목 잔존). **이 렌더러는 부재(absence)만 탐지하며 품질을 판단하지 않는다** —
+  `GAPS=0`은 "기계적으로 빠진 게 없다"는 뜻이지 "구조가 좋다"는 판정이 아니다. 이 구분을
+  놓치면 사람이 직접 승인해야 할 Gate 1이 자동 러버스탬프로 오독될 수 있다.
+
+### Changed
+
+- **경로 SSOT 확장** (`references/output-layout.md`) — `.omd/<slug>/`에 `outline.md`·
+  `plan.md`·`gate1.html`·`consensus/`를 명명된 항목으로 추가. `consensus/`는 기존
+  `docs-plan --consensus`가 이미 쓰고 있던 경로를 이번에 SSOT 표에 정정 반영한 것.
+- **6개 하위 참조 지점**이 `.omd/<slug>/outline.md`를 이름으로 가리키도록 갱신 —
+  `agents/doc-builder.md`(2곳), `agents/doc-verifier.md`, `skills/docs-verify/SKILL.md`,
+  `skills/docs-build/SKILL.md`, `skills/docs-revise/SKILL.md`.
+
 ## [0.6.6] - 2026-08-09
 
 ### Fixed
