@@ -295,18 +295,20 @@ def test_several_mutations_return_all_their_flags():
                             "no-coverage-check", "open-questions"}
 
 
-def test_flags_never_returns_a_code_outside_the_nine():
+def test_flags_never_returns_an_unknown_code():
     known = {"missing-field", "no-units", "missing-arc", "number-gap",
              "duplicate-unit", "no-coverage-check", "coverage-unresolved",
-             "density-unresolved", "open-questions"}
+             "density-unresolved", "open-questions", "malformed-row"}
     garbage = ov.Outline(
         arc="", arc_why="",
         units=[ov.Unit(number=None, name="", purpose="", message="", asset="")],
         coverage_sections="no", coverage_density="no",
         has_coverage_check=True,
         questions=["what dataset?"],
+        malformed_rows=[1],  # exercise malformed-row too, so this isn't vacuous
     )
     result = {f.code for f in flags(garbage)}
+    assert "malformed-row" in result
     assert result <= known
     assert flags(garbage)  # ran without raising
 
