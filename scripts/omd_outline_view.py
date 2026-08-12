@@ -60,7 +60,7 @@ _ROW_SPLIT_RE = re.compile(r"(?<!\\)\|")
 # from the planner's own <Output_Format> example (agents/doc-planner.md).
 # Still pure character-presence — no reading for sense.
 _PLACEHOLDER_VALUES = {"", "tbd", "…", "...", "n/a", "-"}
-_BRACKET_PLACEHOLDER_RE = re.compile(r"^\[.+\]$")
+_BRACKET_PLACEHOLDER_RE = re.compile(r"^\[[^\]]+\]$")
 
 
 def _is_placeholder(value: str | None) -> bool:

@@ -30,7 +30,7 @@ Gate 1 사용자 승인이 근거로 삼는 아웃라인이 그동안 경로를 
 - **Gate 1 렌더 뷰** — `scripts/omd_outline_view.py`(`parse_outline`/`flags`/`render_html`/
   `main`)가 저장된 `outline.md`를 파싱해 `.omd/<slug>/gate1.html`에 스토리보드 패널
   스트립을 렌더링한다. `docs-plan`이 Gate 1에서 이 렌더를 실행하고 갭을 보고한다.
-  스크립트 자체 테스트 41건(`tests/test_omd_outline_view.py`).
+  스크립트 자체 테스트 50건(`tests/test_omd_outline_view.py`).
 - **10종 기계적 갭 탐지** — `missing-arc`(Arc/Frame 또는 Why 누락) · `no-units`(Outline
   섹션에 유닛 행 없음) · `missing-field`(유닛의 필수 컬럼/asset 누락) · `number-gap`(유닛
   번호가 1..N 연속이 아님 — 결번·중복·순서 뒤바뀜 모두 포함) · `duplicate-unit`(두 유닛의

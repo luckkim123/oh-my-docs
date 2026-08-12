@@ -506,6 +506,17 @@ def test_bracketed_placeholder_cells_are_missing_field_and_missing_arc():
     assert codes(text) == {"missing-arc", "missing-field"}
 
 
+def test_message_with_two_bracketed_spans_is_not_a_placeholder():
+    # The bracket-placeholder regex was greedy (`^\[.+\]$`), so any cell that
+    # merely starts with "[" and ends with "]" was flagged regardless of real
+    # content sitting between the brackets — e.g. an authored message like
+    # "[draft] we ship in Q3 [rev 2]".
+    text = COMPLETE.replace(
+        "| 1 | Title | frame the talk | who, what, and when | none |",
+        "| 1 | Title | frame the talk | [draft] we ship in Q3 [rev 2] | none |")
+    assert codes(text) == set()
+
+
 def test_ellipsis_and_dash_cells_are_missing_field():
     text = COMPLETE.replace(
         "| 3 | Contribution | state what is new | we add an adaptive filter | none |",
