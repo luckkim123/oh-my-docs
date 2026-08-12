@@ -9,6 +9,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import pytest
+
 SCRIPT = Path(__file__).parent.parent / "scripts" / "omd_outline_view.py"
 
 _spec = importlib.util.spec_from_file_location("omd_outline_view", SCRIPT)
@@ -19,6 +21,8 @@ _spec.loader.exec_module(ov)
 
 parse_outline = ov.parse_outline
 flags = ov.flags
+render_html = ov.render_html
+main = ov.main
 
 
 def codes(text: str) -> set[str]:
@@ -305,3 +309,114 @@ def test_flags_never_returns_a_code_outside_the_nine():
     result = {f.code for f in flags(garbage)}
     assert result <= known
     assert flags(garbage)  # ran without raising
+
+
+# Task 3 — render_html() and main(). DEFECTIVE is COMPLETE plus exactly one
+# mutation (unit 3's purpose cell emptied): one flag, five units, all names
+# intact — enough to check both "every unit name appears" and "every flag
+# detail appears" in the same fixture.
+
+DEFECTIVE = COMPLETE.replace(
+    "| 3 | Contribution | state what is new | we add an adaptive filter | none |",
+    "| 3 | Contribution |  | we add an adaptive filter | none |")
+
+
+def test_render_html_contains_every_unit_name_and_flag_detail():
+    outline = parse_outline(DEFECTIVE)
+    flagged = flags(outline)
+    assert flagged  # sanity: this fixture does trip a flag
+    out = render_html(outline, flagged)
+    for unit in outline.units:
+        assert unit.name in out
+    for f in flagged:
+        assert f.detail in out
+
+
+def test_render_html_escapes_script_tag_in_a_cell():
+    text = COMPLETE.replace(
+        "| 3 | Contribution | state what is new | we add an adaptive filter | none |",
+        "| 3 | Contribution | state what is new | <script>alert(1)</script> | none |")
+    outline = parse_outline(text)
+    out = render_html(outline, flags(outline))
+    assert "<script>alert(1)</script>" not in out
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in out
+
+
+def test_render_html_has_all_three_theme_selectors():
+    outline = parse_outline(COMPLETE)
+    out = render_html(outline, flags(outline))
+    assert "@media (prefers-color-scheme: dark)" in out
+    assert ':root:not([data-theme="light"])' in out
+    assert ':root[data-theme="dark"]' in out
+
+
+def test_render_html_no_units_flag_detail_survives_empty_panel_strip():
+    # The bug the sibling repo shipped: no-units left the panel strip empty
+    # AND dropped the flag's own detail, so the page explained nothing.
+    text = COMPLETE.replace(
+        """## Outline
+| # | Slide/Section | Purpose | Key message | Required asset |
+|---|---------------|---------|-------------|----------------|
+| 1 | Title | frame the talk | who, what, and when | none |
+| 2 | Research question | establish the gap | localization fails under drift | figure |
+| 3 | Contribution | state what is new | we add an adaptive filter | none |
+| 4 | Method | show it is sound | the filter works by re-weighting | figure |
+| 5 | Experiment | show it holds | it beats the baseline on the metric | table |
+
+""", "")
+    outline = parse_outline(text)
+    assert outline.units == []
+    flagged = flags(outline)
+    out = render_html(outline, flagged)
+    assert "the Outline section has no unit rows" in out
+
+
+def test_main_on_healthy_outline_returns_0_writes_file_and_prints_gaps_0(tmp_path, capsys):
+    input_path = tmp_path / "outline.md"
+    input_path.write_text(COMPLETE, encoding="utf-8")
+    output_path = tmp_path / "gate1.html"
+    code = main([str(input_path), "-o", str(output_path)])
+    out_lines = capsys.readouterr().out.strip().splitlines()
+    assert code == 0
+    assert out_lines == ["GAPS=0"]
+    assert output_path.is_file()
+
+
+def test_main_on_defective_outline_returns_1_writes_file_and_prints_one_line_per_gap(
+        tmp_path, capsys):
+    input_path = tmp_path / "outline.md"
+    input_path.write_text(DEFECTIVE, encoding="utf-8")
+    output_path = tmp_path / "gate1.html"
+    code = main([str(input_path), "-o", str(output_path)])
+    out_lines = capsys.readouterr().out.strip().splitlines()
+    assert code == 1
+    assert len(out_lines) == 2  # one gap line + GAPS=<n>
+    assert out_lines[-1] == "GAPS=1"
+    assert output_path.is_file()
+
+
+def test_main_writes_file_even_when_every_flag_fires(tmp_path, capsys):
+    # Near-empty input trips missing-arc, no-units, no-coverage-check.
+    input_path = tmp_path / "outline.md"
+    input_path.write_text("## Narrative Arc\n", encoding="utf-8")
+    output_path = tmp_path / "gate1.html"
+    code = main([str(input_path), "-o", str(output_path)])
+    out_lines = capsys.readouterr().out.strip().splitlines()
+    assert code == 1
+    assert output_path.is_file()
+    assert output_path.read_text(encoding="utf-8")
+    assert out_lines[-1].startswith("GAPS=")
+    assert int(out_lines[-1].removeprefix("GAPS=")) == len(out_lines) - 1
+
+
+def test_main_default_output_path_is_gate1_html_beside_input(tmp_path):
+    input_path = tmp_path / "outline.md"
+    input_path.write_text(COMPLETE, encoding="utf-8")
+    main([str(input_path)])
+    assert (tmp_path / "gate1.html").is_file()
+
+
+def test_main_missing_input_file_goes_through_parser_error(tmp_path, capsys):
+    missing = tmp_path / "nope.md"
+    with pytest.raises(SystemExit):
+        main([str(missing)])

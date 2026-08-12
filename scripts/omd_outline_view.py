@@ -8,8 +8,11 @@ exception here.
 """
 from __future__ import annotations
 
+import argparse
+import html
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 
 
 @dataclass
@@ -219,14 +222,210 @@ def flags(outline: Outline) -> list[Flag]:
     return out
 
 
-def render_html(outline: Outline, flagged: list[str]) -> str:
-    """Task 3 — not yet implemented."""
-    raise NotImplementedError("render_html() is Task 3")
+# Which unit(s) a "missing-field" / "duplicate-unit" detail names, so its panel
+# can be marked flagged in the strip. The other 7 codes are not unit-specific
+# and only ever appear in the gaps list.
+_UNIT_FIELD_RE = re.compile(r"^unit (\S+):")
+_UNIT_DUP_RE = re.compile(r"appears at units (\d+) and (\d+)")
 
 
-def main() -> int:
-    """Task 3 — not yet implemented."""
-    raise NotImplementedError("main() is Task 3")
+def _flagged_unit_refs(flagged: list[Flag]) -> set[str]:
+    refs: set[str] = set()
+    for f in flagged:
+        if f.code == "missing-field":
+            m = _UNIT_FIELD_RE.match(f.detail)
+            if m:
+                refs.add(m.group(1))
+        elif f.code == "duplicate-unit":
+            m = _UNIT_DUP_RE.search(f.detail)
+            if m:
+                refs.add(m.group(1))
+                refs.add(m.group(2))
+    return refs
+
+
+def _render_panel(unit: Unit, position: int, refs: set[str]) -> str:
+    number_display = str(unit.number) if unit.number is not None else "—"
+    is_flagged = str(unit.number) in refs or str(position) in refs
+    css_class = "panel panel--flagged" if is_flagged else "panel"
+    badge = '<span class="panel-badge">FLAGGED</span>' if is_flagged else ""
+    return f"""      <article class="{css_class}">
+        <div class="panel-head"><span class="panel-number">{html.escape(number_display)}</span>{badge}</div>
+        <h3>{html.escape(unit.name)}</h3>
+        <p class="panel-purpose">{html.escape(unit.purpose)}</p>
+        <p class="panel-message">{html.escape(unit.message)}</p>
+        <span class="panel-asset">{html.escape(unit.asset)}</span>
+      </article>"""
+
+
+def render_html(outline: Outline, flagged: list[Flag]) -> str:
+    """One self-contained HTML page: the arc as frame, units as a panel strip
+    in reading order, and every flag's detail — a gate1 review sheet, not a
+    verdict. No score, no grade, no "looks good" — GAPS=0 means nothing is
+    mechanically absent, not that the structure is approved.
+    """
+    refs = _flagged_unit_refs(flagged)
+    panels = "\n".join(_render_panel(u, i, refs) for i, u in enumerate(outline.units, start=1))
+    panel_strip = (panels if outline.units
+                   else '      <p class="empty-note">No unit rows to display.</p>')
+
+    if flagged:
+        gap_items = "\n".join(
+            f'        <li><span class="gap-code">{html.escape(f.code)}</span> '
+            f'{html.escape(f.detail)}</li>'
+            for f in flagged)
+        gaps_html = f'      <ul class="gaps-list">\n{gap_items}\n      </ul>'
+    else:
+        gaps_html = '      <p class="empty-note">No structural gaps detected.</p>'
+
+    arc = html.escape(outline.arc) if outline.arc else "—"
+    arc_why = html.escape(outline.arc_why) if outline.arc_why else "—"
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GATE1 Outline Review</title>
+<style>
+:root {{
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #5c5c5c;
+  --panel-bg: #f7f7f8;
+  --panel-border: #d9d9dc;
+  --flag-bg: #fdf1f1;
+  --flag-border: #b3261e;
+  --accent: #2c5aa0;
+}}
+@media (prefers-color-scheme: dark) {{
+  :root:not([data-theme="light"]) {{
+    --bg: #17171a;
+    --fg: #eaeaea;
+    --muted: #a3a3a8;
+    --panel-bg: #232327;
+    --panel-border: #3a3a40;
+    --flag-bg: #3a2222;
+    --flag-border: #e57373;
+    --accent: #85a8db;
+  }}
+}}
+:root[data-theme="dark"] {{
+  --bg: #17171a;
+  --fg: #eaeaea;
+  --muted: #a3a3a8;
+  --panel-bg: #232327;
+  --panel-border: #3a3a40;
+  --flag-bg: #3a2222;
+  --flag-border: #e57373;
+  --accent: #85a8db;
+}}
+* {{ box-sizing: border-box; }}
+body {{
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 0;
+  padding: 2rem;
+  line-height: 1.4;
+}}
+h1 {{ font-size: 1.3rem; margin: 0 0 0.5rem; }}
+h2 {{ font-size: 1rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }}
+.frame {{ margin: 0 0 2rem; color: var(--muted); }}
+.frame strong {{ color: var(--fg); }}
+.gaps-list {{ list-style: none; margin: 0; padding: 0; }}
+.gaps-list li {{
+  padding: 0.4rem 0.6rem;
+  margin-bottom: 0.3rem;
+  background: var(--flag-bg);
+  border-left: 3px solid var(--flag-border);
+}}
+.gap-code {{ font-family: monospace; font-weight: bold; margin-right: 0.5rem; }}
+.empty-note {{ color: var(--muted); }}
+.panel-grid {{
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}}
+.panel {{
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 0.8rem;
+}}
+.panel--flagged {{ border-color: var(--flag-border); background: var(--flag-bg); }}
+.panel-head {{ display: flex; align-items: center; justify-content: space-between; }}
+.panel-number {{
+  display: inline-block;
+  font-family: monospace;
+  font-weight: bold;
+  color: var(--accent);
+}}
+.panel-badge {{
+  font-size: 0.7rem;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--flag-border);
+  color: var(--flag-border);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+}}
+.panel h3 {{ margin: 0.4rem 0 0.3rem; font-size: 1rem; }}
+.panel-purpose {{ color: var(--muted); margin: 0 0 0.3rem; }}
+.panel-message {{ margin: 0 0 0.5rem; }}
+.panel-asset {{
+  display: inline-block;
+  font-size: 0.75rem;
+  background: var(--panel-border);
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+}}
+</style>
+</head>
+<body>
+  <header>
+    <h1>GATE1 Outline Review</h1>
+    <p class="frame"><strong>Frame:</strong> {arc} &nbsp;·&nbsp; <strong>Why:</strong> {arc_why}</p>
+  </header>
+  <section class="gaps">
+    <h2>Gaps ({len(flagged)})</h2>
+{gaps_html}
+  </section>
+  <section class="panels">
+    <h2>Units</h2>
+    <div class="panel-grid">
+{panel_strip}
+    </div>
+  </section>
+</body>
+</html>
+"""
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Render a GATE1 outline review sheet.")
+    parser.add_argument("input", help="path to the approved outline markdown file")
+    parser.add_argument("-o", "--output", help="output HTML path (default: gate1.html beside input)")
+    args = parser.parse_args(argv)
+
+    input_path = Path(args.input)
+    if not input_path.is_file():
+        parser.error(f"no such file: {args.input}")
+
+    output_path = Path(args.output) if args.output else input_path.parent / "gate1.html"
+
+    outline = parse_outline(input_path.read_text(encoding="utf-8"))
+    flagged = flags(outline)
+
+    # Write unconditionally, before deciding the exit code — a defective
+    # outline is exactly when the user most needs the sheet.
+    output_path.write_text(render_html(outline, flagged), encoding="utf-8")
+
+    for f in flagged:
+        print(f"{f.code}: {f.detail}")
+    print(f"GAPS={len(flagged)}")
+
+    return 1 if flagged else 0
 
 
 if __name__ == "__main__":
