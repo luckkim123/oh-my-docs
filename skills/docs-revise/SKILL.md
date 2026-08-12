@@ -28,7 +28,7 @@ Fixes an existing document until verify gives a PASS. Repeats doc-builder (fixes
 <Execution_Policy>
 - **Definition of pass — the document counterpart of ralph's `passes:true`.** The acceptance criteria below must *all* be satisfied for a PASS. If any one falls short, it is not passed (no partial PASS):
   1.–2. The pass definition follows doc-verifier's verdict on the **card-defined verify gate** for the target format, verbatim — office: integrity 5/5 (zip CRC · engine parse · soffice convert · dangling rels · orphan master; 4/5 is a FAIL) + full PNG read-through (≥150dpi, every slide/page including unchanged ones); text genres: the card's deterministic chain + fresh-read. This clause auto-tracks the verifier's card delegation — do not restate gate numbers here (PS-4).
-  3. All required outline sections present.
+  3. All required outline sections present, checked against `.omd/<slug>/outline.md`.
   4. The FAIL defect from the previous round does not recur.
 - Each iteration: doc-builder fixes → doc-verifier verifies with fresh evidence (no reuse of prior verification).
 - **Do not manufacture a PASS by reducing scope, filling placeholders, or bypassing checks** (ralph: no scope reduction, no deleting tests).

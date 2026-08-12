@@ -35,7 +35,7 @@ Office integrity = zip CRC · engine parsing · soffice conversion · dangling r
 </Checks>
 
 <Steps>
-1. Dispatch doc-verifier (passing the outline + output path):
+1. Dispatch doc-verifier (passing the outline `.omd/<slug>/outline.md` + output path):
    `Task(subagent_type="oh-my-docs:doc-verifier", ...)`
 2. The verifier directly runs the card-defined verify gate (office: the 5 integrity checks + ≥150dpi exhaustive read-through; text genres: the exit-code chain with logs captured to .omd/<slug>/verify-runs/) + completeness against the outline + versions/ count.
 3. **style-spec meta consistency (read-only, H10)** — if `.omd/wiki/convention/lab-style-spec.md` (or `<key>-style-spec.md`) has

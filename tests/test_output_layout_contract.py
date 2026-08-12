@@ -57,3 +57,19 @@ def test_ownership_guard_consumers_wired():
                 "agents/doc-builder.md"):
         body = (root / rel).read_text(encoding="utf-8")
         assert "3.4" in body and "manifest" in body.lower(), rel
+
+
+def test_gate1_outline_artifacts_named():
+    # the path SSOT for the Gate 1 outline/consensus artifacts docs-plan writes
+    for token in ("outline.md", "plan.md", "gate1.html", "consensus/"):
+        assert token in CARD, f"{token} missing from output-layout card"
+
+
+def test_cleanup_table_excludes_outline_and_plan():
+    # outline.md/plan.md are the spec the artifact was built from — a revise or
+    # rebuild needs them after renders/versions are gone, so §5.2 must not list
+    # them as cleanup targets.
+    section = CARD.split("### 5.2")[1].split("### 5.3")[0]
+    table = "\n".join(ln for ln in section.splitlines() if ln.strip().startswith("|"))
+    assert "outline.md" not in table
+    assert "plan.md" not in table

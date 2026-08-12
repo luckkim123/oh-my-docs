@@ -86,6 +86,11 @@ outputs/<slug>/
 
 .omd/<slug>/                          # work area — everything the user rarely needs directly
   manifest.json                       # artifact-set only: {"slug","format","paths":[{"path","sha256","role"}]}
+  outline.md                          # approved structure (arc + outline + coverage check)
+  plan.md                             # --consensus only: decision process (RALPLAN-DR + ADR)
+  gate1.html                          # rendered view of outline.md
+  consensus/
+    <stage>-<role>.md                 # --consensus only: sequential handoff files
   versions/
     v{NN}_{YYYY-MM-DD}_{summary}.<ext>   # single-file version copies (§3 rules)
     v{NN}_{YYYY-MM-DD}_{summary}/        # artifact-set snapshots: the whole current/ copied (LC-1)
@@ -108,12 +113,14 @@ outputs/<slug>/
 
 ### 2.1 Invariance rules
 
-- The four subdirectories (`versions/ renders/ gen-image/ tmp/`) are **always this name, this
-  place**. They do not change by job type or format.
+- Every file and subdirectory named in §2 — `outline.md plan.md gate1.html consensus/ versions/
+  renders/ gen-image/ tmp/` and the rest — is **always this name, this place**. They do not change
+  by job type or format.
 - The structure is identical even when empty (a job that uses no gen-image either leaves an empty
   `gen-image/` or simply omits it — but never invents a different name for it).
-- A new kind of intermediate maps into one of the four (no inventing a new top-level folder). Only a
-  genuinely new category that maps to none of them is added by amending this convention.
+- A new kind of intermediate maps into an existing entry (no inventing a new top-level file or
+  folder). Only a genuinely new category that maps to none of them is added by amending this
+  convention.
 
 ---
 
@@ -221,6 +228,9 @@ done by the skill/agent about to write (docs-build, docs-revise, doc-builder, pi
 | `.omd/<slug>/versions/` | ✅ **all but the latest 1 + user-designated milestones** | keep the near-final copy, prune the middle (artifact-set: same rule, directory-wise) |
 | `outputs/<slug>/current.<ext>` | ❌ never | user asset — excluded from tally and deletion, mentioned only |
 
+`outline.md` and `plan.md` are deliberately **not** in this table — they are the specification the
+artifact was built from, and a revise or rebuild needs them after the renders and versions are gone.
+
 ### 5.3 Safe procedure
 
 1. **Tally** the cleanup targets under `.omd/<slug>/`: size and count
@@ -247,6 +257,7 @@ done by the skill/agent about to write (docs-build, docs-revise, doc-builder, pi
 
 ## 6. Implementation checklist (consumers of this card)
 
+- [ ] `docs-plan` writes `outline.md` (and, `--consensus` only, `plan.md` + `consensus/`) before Gate 1
 - [ ] `docs-build` / `docs-pilot` / `doc-builder` express the working copy as `outputs/<slug>/current.<ext>`
 - [ ] version snapshots and PNG renders go under `.omd/<slug>/{versions,renders}/`, not `outputs/`
 - [ ] `doc-verifier` checks `.omd/<slug>/versions/` count against the prune threshold
