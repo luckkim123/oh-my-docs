@@ -119,6 +119,38 @@ def test_multi_digit_and_dotted_numbers_survive():
     assert dotted.units[0].number is None  # not silently truncated to 4
 
 
+# Fix round 1 (task-2 review) — _SECTIONS_RE / _DENSITY_RE used \s* before the
+# capture group, which swallows the newline and bleeds into the next line's
+# text when the planner's line has nothing after the colon. Regression tests
+# for the two states that must stay distinct: present-but-empty ("") vs
+# absent (None).
+
+def test_coverage_line_present_but_empty_does_not_bleed_into_next_line():
+    text = ("## Coverage Check\n"
+            "- Required sections all placed:\n"
+            "- Density limits respected: yes\n")
+    outline = parse_outline(text)
+    assert outline.coverage_sections == ""
+    assert outline.coverage_density == "yes"
+
+
+def test_both_coverage_lines_present_but_empty_stay_independently_empty():
+    text = ("## Coverage Check\n"
+            "- Required sections all placed:\n"
+            "- Density limits respected:\n")
+    outline = parse_outline(text)
+    assert outline.coverage_sections == ""
+    assert outline.coverage_density == ""
+
+
+def test_coverage_section_absent_still_yields_none_after_regex_fix():
+    text = "## Outline\n| 1 | Title | x | y | none |\n"
+    outline = parse_outline(text)
+    assert outline.has_coverage_check is False
+    assert outline.coverage_sections is None
+    assert outline.coverage_density is None
+
+
 # Task 2 — flags(). Each test is COMPLETE plus exactly one mutation, asserting
 # exact set equality against spec sec 3.4's 9 codes.
 

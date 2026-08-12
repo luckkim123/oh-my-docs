@@ -35,8 +35,8 @@ class Outline:
 _ARC_RE = re.compile(r"\*\*Arc/Frame\*\*:\s*(.+)")
 _SECTION_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 _SEP_ROW_RE = re.compile(r"^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
-_SECTIONS_RE = re.compile(r"Required sections all placed:\s*(.+)")
-_DENSITY_RE = re.compile(r"Density limits respected:\s*(.+)")
+_SECTIONS_RE = re.compile(r"Required sections all placed:[ \t]*(.*)")
+_DENSITY_RE = re.compile(r"Density limits respected:[ \t]*(.*)")
 
 
 def _section_body(text: str, heading: str) -> str | None:
