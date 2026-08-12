@@ -420,3 +420,55 @@ def test_main_missing_input_file_goes_through_parser_error(tmp_path, capsys):
     missing = tmp_path / "nope.md"
     with pytest.raises(SystemExit):
         main([str(missing)])
+
+
+# Fix round 1 (task-3 review) — duplicate-unit's positions and a unit's own
+# `#` value were conflated into one string-keyed ref set, so an unrelated
+# unit whose `#` happened to equal a duplicate's position got wrongly
+# flagged. Root fix: Flag carries unit_pos (reading-order positions), never
+# matched against unit.number.
+
+def _panel_blocks_for(out: str, name: str) -> list[str]:
+    """Each panel's HTML, from its <article ...> to the next one, for a
+    given unit name — a duplicate name yields more than one block.
+    """
+    parts = out.split("<article")[1:]
+    return [f"<article{p}" for p in parts if f"<h3>{name}</h3>" in p]
+
+
+def test_unrelated_unit_not_flagged_when_its_number_collides_with_a_duplicate_position():
+    text = ("## Narrative Arc\n**Arc/Frame**: x — **Why**: y.\n\n"
+            "## Outline\n"
+            "| 5 | Foo | p | m | none |\n"
+            "| 9 | Foo | p | m | none |\n"
+            "| 1 | Bar | p | m | none |\n")
+    outline = parse_outline(text)
+    flagged = flags(outline)
+    assert {f.code for f in flagged} == {"number-gap", "duplicate-unit", "no-coverage-check"}
+    out = render_html(outline, flagged)
+
+    (bar_block,) = _panel_blocks_for(out, "Bar")
+    assert "panel--flagged" not in bar_block  # Bar's "#" is 1, same digit as
+                                               # the duplicate's positions — must not match
+
+    foo_blocks = _panel_blocks_for(out, "Foo")
+    assert len(foo_blocks) == 2
+    assert all("panel--flagged" in b for b in foo_blocks)
+
+
+def test_missing_field_flags_panel_by_position_not_by_number_value():
+    # Position 1 has "#" = 9 (matches nothing); position 2 has a blank
+    # purpose. Only position 2's panel may be flagged.
+    text = ("## Narrative Arc\n**Arc/Frame**: x — **Why**: y.\n\n"
+            "## Outline\n"
+            "| 9 | Alpha | p | m | none |\n"
+            "| 2 | Beta |  | m | none |\n")
+    outline = parse_outline(text)
+    flagged = flags(outline)
+    assert {f.code for f in flagged} == {"missing-field", "number-gap", "no-coverage-check"}
+    out = render_html(outline, flagged)
+
+    (alpha_block,) = _panel_blocks_for(out, "Alpha")
+    (beta_block,) = _panel_blocks_for(out, "Beta")
+    assert "panel--flagged" not in alpha_block
+    assert "panel--flagged" in beta_block

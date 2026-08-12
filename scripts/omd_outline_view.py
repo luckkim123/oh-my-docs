@@ -151,6 +151,10 @@ def parse_outline(text: str) -> Outline:
 class Flag:
     code: str
     detail: str
+    # 1-based position(s) in outline.units this flag concerns, in reading
+    # order — () for the 7 codes that aren't about a specific unit. Lets the
+    # renderer mark panels without re-parsing `detail` text.
+    unit_pos: tuple[int, ...] = ()
 
 
 # "none" is a legitimate Required-asset value (nothing needed); it is not a
@@ -178,16 +182,18 @@ def flags(outline: Outline) -> list[Flag]:
     if not units:
         out.append(Flag("no-units", "the Outline section has no unit rows"))
     else:
-        for unit in units:
+        for position, unit in enumerate(units, start=1):
             for column, value in (("name", unit.name), ("purpose", unit.purpose),
                                    ("message", unit.message)):
                 value = (value or "").strip()
                 if not value or value.casefold() == "tbd":
-                    out.append(Flag("missing-field", f"unit {unit.number}: {column} is missing"))
+                    out.append(Flag("missing-field", f"unit {unit.number}: {column} is missing",
+                                     unit_pos=(position,)))
             asset = (unit.asset or "").strip()
             if asset.casefold() not in _ASSET_NONE_VALUES and (
                     not asset or asset.casefold() == "tbd"):
-                out.append(Flag("missing-field", f"unit {unit.number}: asset is missing"))
+                out.append(Flag("missing-field", f"unit {unit.number}: asset is missing",
+                                 unit_pos=(position,)))
 
         expected = list(range(1, len(units) + 1))
         actual = [u.number for u in units]
@@ -201,7 +207,8 @@ def flags(outline: Outline) -> list[Flag]:
                 continue
             if name in seen:
                 out.append(Flag("duplicate-unit",
-                                 f"'{name}' appears at units {seen[name]} and {position}"))
+                                 f"'{name}' appears at units {seen[name]} and {position}",
+                                 unit_pos=(seen[name], position)))
             else:
                 seen[name] = position
 
@@ -222,31 +229,20 @@ def flags(outline: Outline) -> list[Flag]:
     return out
 
 
-# Which unit(s) a "missing-field" / "duplicate-unit" detail names, so its panel
-# can be marked flagged in the strip. The other 7 codes are not unit-specific
-# and only ever appear in the gaps list.
-_UNIT_FIELD_RE = re.compile(r"^unit (\S+):")
-_UNIT_DUP_RE = re.compile(r"appears at units (\d+) and (\d+)")
-
-
-def _flagged_unit_refs(flagged: list[Flag]) -> set[str]:
-    refs: set[str] = set()
+def _flagged_positions(flagged: list[Flag]) -> set[int]:
+    """1-based positions (reading order) any flag concerns — never a unit's
+    own `#` value, which can differ from its position when number-gap or
+    duplicate-unit has also fired.
+    """
+    refs: set[int] = set()
     for f in flagged:
-        if f.code == "missing-field":
-            m = _UNIT_FIELD_RE.match(f.detail)
-            if m:
-                refs.add(m.group(1))
-        elif f.code == "duplicate-unit":
-            m = _UNIT_DUP_RE.search(f.detail)
-            if m:
-                refs.add(m.group(1))
-                refs.add(m.group(2))
+        refs.update(f.unit_pos)
     return refs
 
 
-def _render_panel(unit: Unit, position: int, refs: set[str]) -> str:
+def _render_panel(unit: Unit, position: int, refs: set[int]) -> str:
     number_display = str(unit.number) if unit.number is not None else "—"
-    is_flagged = str(unit.number) in refs or str(position) in refs
+    is_flagged = position in refs
     css_class = "panel panel--flagged" if is_flagged else "panel"
     badge = '<span class="panel-badge">FLAGGED</span>' if is_flagged else ""
     return f"""      <article class="{css_class}">
@@ -264,7 +260,7 @@ def render_html(outline: Outline, flagged: list[Flag]) -> str:
     verdict. No score, no grade, no "looks good" — GAPS=0 means nothing is
     mechanically absent, not that the structure is approved.
     """
-    refs = _flagged_unit_refs(flagged)
+    refs = _flagged_positions(flagged)
     panels = "\n".join(_render_panel(u, i, refs) for i, u in enumerate(outline.units, start=1))
     panel_strip = (panels if outline.units
                    else '      <p class="empty-note">No unit rows to display.</p>')
