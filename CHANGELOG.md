@@ -31,12 +31,14 @@ Gate 1 사용자 승인이 근거로 삼는 아웃라인이 그동안 경로를 
   `main`)가 저장된 `outline.md`를 파싱해 `.omd/<slug>/gate1.html`에 스토리보드 패널
   스트립을 렌더링한다. `docs-plan`이 Gate 1에서 이 렌더를 실행하고 갭을 보고한다.
   스크립트 자체 테스트 41건(`tests/test_omd_outline_view.py`).
-- **9종 기계적 갭 탐지** — `missing-arc`(Arc/Frame 또는 Why 누락) · `no-units`(Outline
+- **10종 기계적 갭 탐지** — `missing-arc`(Arc/Frame 또는 Why 누락) · `no-units`(Outline
   섹션에 유닛 행 없음) · `missing-field`(유닛의 필수 컬럼/asset 누락) · `number-gap`(유닛
   번호가 1..N 연속이 아님 — 결번·중복·순서 뒤바뀜 모두 포함) · `duplicate-unit`(두 유닛의
   이름(Slide/Section)이 동일 — 번호 중복이 아니라 이름 중복) · `no-coverage-check`(Coverage Check
   섹션 누락) · `coverage-unresolved` · `density-unresolved` · `open-questions`(미해결
-  항목 잔존). **이 렌더러는 부재(absence)만 탐지하며 품질을 판단하지 않는다** —
+  항목 잔존) · `malformed-row`(행이 정확히 5칸으로 안 쪼개짐 — 셀 안의 이스케이프 안 된
+  `|`가 뒤 컬럼을 밀어내는 경우 등, 최종 리뷰 라운드에서 추가). **이 렌더러는
+  부재(absence)만 탐지하며 품질을 판단하지 않는다** —
   `GAPS=0`은 "기계적으로 빠진 게 없다"는 뜻이지 "구조가 좋다"는 판정이 아니다. 이 구분을
   놓치면 사람이 직접 승인해야 할 Gate 1이 자동 러버스탬프로 오독될 수 있다.
 

@@ -137,7 +137,7 @@ message, and an asset chip. The arc and its justification sit above the strip as
 the literal storyboard the feature is named after, and the sequence is the thing the user is being
 asked to approve.
 
-### 3.4 Flags — nine, all absence
+### 3.4 Flags — ten, all absence
 
 | # | Code | Fires when |
 |:--|:---|:---|
@@ -150,6 +150,7 @@ asked to approve.
 | 7 | `coverage-unresolved` | "Required sections all placed" is not `yes` — reported **verbatim** |
 | 8 | `density-unresolved` | "Density limits respected" is not `yes` — reported **verbatim** |
 | 9 | `open-questions` | the Open Questions section is non-empty |
+| 10 | `malformed-row` | an Outline row did not split into exactly 5 cells |
 
 Documented exemptions — each is a case where absence is *correct* and must not flag:
 
@@ -158,6 +159,13 @@ Documented exemptions — each is a case where absence is *correct* and must not
 - **`Required asset: none` is a legitimate value**, never `missing-field`. A title slide needs no figure.
 - **`plan.md` is never parsed.** The renderer reads the outline and nothing else, so `--direct` and
   `--consensus` produce the same sheet from the same input.
+
+**`malformed-row` was added after the initial 9, during the final review wave (2026-08-12), and this
+is the record of why.** An unescaped `|` inside a table cell (e.g. a title containing a literal pipe)
+shifts every column right of it by one, and none of the other nine codes catches that: `missing-field`
+stays silent whenever all the shifted cells happen to be non-empty, which is the common case. Still pure
+character-presence (a cell count, never a read for sense) — it belongs to the same invariant as the
+other nine, just late to the table.
 
 **Deliberately not implemented: a slide-count or density budget flag.** oms has `over-budget`
 because its outline carries a machine-readable `page_limit` and per-section word counts. omd's
